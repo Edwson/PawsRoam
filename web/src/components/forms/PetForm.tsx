@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, FormEvent, useEffect } from 'react';
+import { gql, useLazyQuery } from '@apollo/client'; // Import useLazyQuery
 
 // Define the structure for pet data, aligning with GQL input types
 export interface PetFormData {
@@ -28,19 +29,59 @@ const PetForm: React.FC<PetFormProps> = ({
   onSubmitFunction,
   submitButtonText = 'Save Pet',
   isLoading = false,
-  children, // For placing AI suggester button etc.
+  // children,
 }) => {
   const [formData, setFormData] = useState<PetFormData>({
     name: '',
-    species: availableSpecies[0], // Default to first species
+    species: availableSpecies[0],
     breed: '',
     birthdate: '',
     avatar_url: '',
     notes: '',
-    ...initialData, // Spread initialData to override defaults if provided
+    ...initialData,
+  });
+  const [characteristics, setCharacteristics] = useState('');
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+
+  const SUGGEST_PET_NAME_QUERY = gql`
+    query SuggestPetName($species: String!, $characteristics: [String]) {
+      suggestPetName(species: $species, characteristics: $characteristics)
+    }
+  `;
+
+  const [
+    executeSuggestNameQuery,
+    { loading: suggestionsLoading, error: suggestionsQueryError, data: suggestionsData }
+  ] = useLazyQuery(SUGGEST_PET_NAME_QUERY, {
+    onCompleted: (data) => {
+      if (data && data.suggestPetName && data.suggestPetName.length > 0) {
+        setNameSuggestions(data.suggestPetName);
+        setSuggestionError(null);
+      } else {
+        setNameSuggestions([]);
+        setSuggestionError("No suggestions found, try different characteristics!");
+      }
+    },
+    onError: (err) => {
+      setNameSuggestions([]);
+      setSuggestionError(`Error fetching suggestions: ${err.message}`);
+    }
   });
 
-  // Update form if initialData changes (e.g., when editing and data loads)
+  const handleSuggestNames = () => {
+    if (!formData.species) {
+      setSuggestionError("Please select a species first.");
+      return;
+    }
+    setSuggestionError(null);
+    setNameSuggestions([]); // Clear previous suggestions
+
+    const charsArray = characteristics.split(',').map(c => c.trim()).filter(c => c);
+    executeSuggestNameQuery({ variables: { species: formData.species, characteristics: charsArray } });
+  };
+
+  // Update form if initialData changes
   useEffect(() => {
     if (initialData) {
       setFormData(prev => ({
@@ -84,12 +125,73 @@ const PetForm: React.FC<PetFormProps> = ({
                 disabled={isLoading}
                 style={{ flexGrow: 1 }}
             />
-            {/* Placeholder for children like AI Suggestion button */}
-            {children && React.Children.map(children, child =>
-                React.isValidElement(child) && child.props.fieldName === 'name' ? child : null
-            )}
+            {/* AI Name Suggestion Button will be added here in the next step */}
         </div>
       </div>
+
+      {/* Name Suggestion Section - only show when adding, not editing (based on initialData) */}
+      {!initialData?.id && (
+        <div style={{
+          marginBottom: '1.5rem', // Increased bottom margin for overall section
+          marginTop: '0.5rem',
+          padding: '1rem', // Added padding to the wrapper
+          border: '1px dashed var(--current-border-color)', // Dashed border to make it look like an optional/helper section
+          borderRadius: '4px'
+        }}>
+          <label htmlFor="characteristics">Characteristics (for name suggestion, e.g., playful, fluffy):</label>
+          <input
+            type="text"
+            id="characteristics"
+            name="characteristics"
+            value={characteristics}
+            onChange={(e) => setCharacteristics(e.target.value)}
+            disabled={isLoading}
+            placeholder="e.g., playful, loyal, tiny"
+          />
+          <button
+            type="button"
+            onClick={handleSuggestNames}
+            disabled={isLoading || suggestionsLoading || !formData.species}
+            className="button-style"
+            style={{ marginTop: '0.5rem', backgroundColor: 'var(--accent-color)', width: '100%' }} // Make button full width
+          >
+            {suggestionsLoading ? 'Suggesting...' : 'Suggest Names ✨'}
+          </button>
+
+          {suggestionError && <p className="error-message" style={{marginTop: '0.75rem', marginBottom: '0'}}>{suggestionError}</p>}
+
+          {nameSuggestions.length > 0 && (
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--current-border-color)', paddingTop: '1rem' }}>
+              <p style={{ margin: '0 0 0.75rem 0', fontWeight: '500', fontSize: '1rem', color: 'var(--primary-dark)' }}>Pick a Name:</p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                {nameSuggestions.map((name, index) => (
+                  <li key={index}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, name: name }));
+                        setNameSuggestions([]);
+                        setSuggestionError(null);
+                      }}
+                      className="button-style" // Use base button style
+                      style={{
+                        backgroundColor: 'var(--current-surface)', // Lighter background for selection
+                        color: 'var(--primary-color)', // Primary color for text
+                        border: '1px solid var(--primary-color)', // Primary border
+                        padding: '0.4rem 0.8rem', // Consistent padding
+                        fontSize: '0.9rem',
+                        fontWeight: 'normal',
+                      }}
+                    >
+                      {name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <label htmlFor="species">Species:</label>
