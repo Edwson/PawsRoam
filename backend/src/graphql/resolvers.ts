@@ -13,25 +13,41 @@ interface DbUser {
   updated_at: Date;
 }
 
-// --- Mock Venue Database ---
-interface Venue {
-  id: string;
+// Define Venue type for database results (matches venues table structure)
+// This should map to the GraphQL Venue type; field names should align or be mapped.
+interface DbVenue {
+  id: string; // UUID
+  owner_user_id?: string | null;
   name: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  type: string; // e.g., "cafe", "park", "store"
-  description: string;
+  address?: string | null;
+  city?: string | null;
+  state_province?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  latitude: number; // Comes as string from pg, will be parsed
+  longitude: number; // Comes as string from pg, will be parsed
+  phone_number?: string | null;
+  website?: string | null;
+  description?: string | null;
+  opening_hours?: any | null; // JSONB
+  type: string;
+  pet_policy_summary?: string | null;
+  pet_policy_details?: string | null;
+  allows_off_leash?: boolean | null;
+  has_indoor_seating_for_pets?: boolean | null;
+  has_outdoor_seating_for_pets?: boolean | null;
+  water_bowls_provided?: boolean | null;
+  pet_treats_available?: boolean | null;
+  pet_menu_available?: boolean | null;
+  dedicated_pet_area?: boolean | null;
+  weight_limit_kg?: number | null; // Comes as string from pg
+  carrier_required?: boolean | null;
+  additional_pet_services?: string | null;
+  status?: string | null;
+  google_place_id?: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
-
-const venuesDB: Venue[] = [
-  { id: 'v1', name: 'The Barking Lot Cafe', address: '123 Doggo Street, Pawsburg', latitude: 35.6800, longitude: 139.7000, type: 'cafe', description: 'A cozy cafe for you and your furry friend. Offers puppuccinos!' },
-  { id: 'v2', name: 'Pawsitive Park', address: '456 Fetch Avenue, Pawsburg', latitude: 35.6850, longitude: 139.7050, type: 'park', description: 'Large off-leash area with agility equipment.' },
-  { id: 'v3', name: 'The Groom Room', address: '789 Tailwag Trail, Pawsburg', latitude: 35.6900, longitude: 139.7100, type: 'store', description: 'Pet supplies and professional grooming services.' },
-  { id: 'v4', name: 'Catnip Corner', address: '101 Meow Lane, Pawsburg', latitude: 35.6750, longitude: 139.6950, type: 'cafe', description: 'A quiet cafe that welcomes well-behaved cats on leashes.' },
-  { id: 'v5', name: 'Riverside Dog Run', address: '222 Water Woof Way, Pawsburg', latitude: 35.6950, longitude: 139.7150, type: 'park', description: 'Scenic park with a dedicated dog run along the river.' },
-];
-// --- End Mock Venue Database ---
 
 
 interface Resolvers {
@@ -48,17 +64,50 @@ export const resolvers: Resolvers = {
     _empty: () => "This is a placeholder query.",
     // Example: me: (parent, args, context) => { // Assuming context contains userId
     //   if (!context.userId) throw new GraphQLError('Not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
-    //   return usersDB.find(user => user.id === context.userId);
+    //   return usersDB.find(user => user.id === context.userId); // This would need to query DB users now
     // }
-    searchVenues: (_: any, { filterByName, filterByType }: { filterByName?: string, filterByType?: string }) => {
-      let results = venuesDB;
+    searchVenues: async (_: any, { filterByName, filterByType }: { filterByName?: string, filterByType?: string }) => {
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+
+      let query = 'SELECT * FROM venues';
+      const conditions: string[] = [];
+      const values: (string | number)[] = [];
+      let valueCount = 1;
+
       if (filterByName) {
-        results = results.filter(venue => venue.name.toLowerCase().includes(filterByName.toLowerCase()));
+        conditions.push(`name ILIKE $${valueCount++}`); // ILIKE for case-insensitive search
+        values.push(`%${filterByName}%`);
       }
       if (filterByType) {
-        results = results.filter(venue => venue.type.toLowerCase() === filterByType.toLowerCase());
+        conditions.push(`type = $${valueCount++}`);
+        values.push(filterByType);
       }
-      return results;
+
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+      }
+      query += ' ORDER BY created_at DESC LIMIT 50'; // Add ordering and limit for safety
+
+      try {
+        const result = await pgPool.query<DbVenue>(query, values);
+        // Ensure numeric fields are numbers, not strings from pg driver
+        return result.rows.map(venue => ({
+          ...venue,
+          latitude: parseFloat(venue.latitude as any),
+          longitude: parseFloat(venue.longitude as any),
+          weight_limit_kg: venue.weight_limit_kg ? parseFloat(venue.weight_limit_kg as any) : null,
+          // Convert TIMESTAMPTZ to ISO string for GraphQL
+          created_at: venue.created_at.toISOString(),
+          updated_at: venue.updated_at.toISOString(),
+        }));
+      } catch (dbError: any) {
+        console.error("Error searching venues in DB:", dbError);
+        throw new GraphQLError('Failed to search venues.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
     },
     testGemini: async (_: any, { prompt }: { prompt: string }) => {
       if (!process.env.GEMINI_API_KEY) {

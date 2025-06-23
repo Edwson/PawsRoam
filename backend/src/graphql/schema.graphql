@@ -32,18 +32,45 @@ type Mutation {
 #   owner: User!
 # }
 
+scalar JSON # For opening_hours
+
 type Venue {
   id: ID!
+  owner_user_id: ID # Corresponds to UUID of user
   name: String!
-  address: String # Simplified for now, could be more structured
+  address: String
+  city: String
+  state_province: String
+  postal_code: String
+  country: String
   latitude: Float!
   longitude: Float!
-  type: String # e.g., "cafe", "park", "store"
+  phone_number: String
+  website: String
   description: String
-  # Add more fields as per README's VenueData, e.g.:
-  # hyperDetailedPolicies: PolicyMatrix
-  # realTimeAvailability: LiveStatus
-  # pawStarRating: CommunityVerification
+  opening_hours: JSON # Use the scalar JSON type
+  type: String! # e.g., "cafe", "park", "store"
+
+  pet_policy_summary: String
+  pet_policy_details: String
+  allows_off_leash: Boolean
+  has_indoor_seating_for_pets: Boolean
+  has_outdoor_seating_for_pets: Boolean
+  water_bowls_provided: Boolean
+  pet_treats_available: Boolean
+  pet_menu_available: Boolean
+  dedicated_pet_area: Boolean
+  weight_limit_kg: Float
+  carrier_required: Boolean
+  additional_pet_services: String
+
+  status: String # e.g., 'active', 'pending_approval'
+  google_place_id: String
+
+  created_at: String # Typically represented as ISO8601 String
+  updated_at: String # Typically represented as ISO8601 String
+
+  # Future computed fields can be added here, e.g., averageRating
 }
 
 # Input type for filtering venues (optional for Phase 1 simple filter)

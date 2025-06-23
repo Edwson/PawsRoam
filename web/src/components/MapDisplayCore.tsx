@@ -25,13 +25,22 @@ import L from 'leaflet'; // Import L for custom icons if needed later
 // });
 
 
-// Venue type placeholder - will eventually come from GraphQL
+// Updated Venue interface to match data from GraphQL query
 interface Venue {
   id: string;
   name: string;
+  address?: string | null;
+  city?: string | null;
   latitude: number;
   longitude: number;
-  type?: string; // e.g., 'cafe', 'park'
+  type: string;
+  description?: string | null;
+  pet_policy_summary?: string | null;
+  allows_off_leash?: boolean | null;
+  has_outdoor_seating_for_pets?: boolean | null;
+  water_bowls_provided?: boolean | null;
+  opening_hours?: any | null; // JSON object
+  // Add other fields from GraphQL query as needed for display
 }
 
 interface MapDisplayCoreProps {
@@ -81,18 +90,34 @@ const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
       />
       {venues.map(venue => (
         <Marker key={venue.id} position={[venue.latitude, venue.longitude]}>
-          <Popup>
-            <strong>{venue.name}</strong><br />
-            Type: {venue.type || 'N/A'}
-            {/* Add more venue details here */}
+          <Popup minWidth={250}> {/* Set a minWidth for better layout */}
+            <div style={{ fontSize: '1rem' }}> {/* Slightly larger base font for popup */}
+              <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--primary-color)' }}>{venue.name}</h4>
+              <p style={{ margin: '0.25rem 0' }}><strong>Type:</strong> {venue.type}</p>
+              {venue.address && <p style={{ margin: '0.25rem 0' }}><strong>Address:</strong> {venue.address}{venue.city ? `, ${venue.city}` : ''}</p>}
+              {venue.description && <p style={{ margin: '0.25rem 0' }}>{venue.description}</p>}
+              {venue.pet_policy_summary && <p style={{ margin: '0.25rem 0', fontStyle: 'italic' }}>Pet Policy: {venue.pet_policy_summary}</p>}
+
+              <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                {venue.allows_off_leash && <li>✔️ Off-leash allowed</li>}
+                {venue.has_outdoor_seating_for_pets && <li>✔️ Outdoor seating for pets</li>}
+                {venue.water_bowls_provided && <li>✔️ Water bowls provided</li>}
+              </ul>
+
+              {/* Placeholder for opening hours - might need a helper to format nicely */}
+              {/* {venue.opening_hours && <p style={{margin: '0.25rem 0', fontSize: '0.85rem'}}>Hours: {JSON.stringify(venue.opening_hours)}</p>} */}
+
+              {/* Add a link to a future venue details page */}
+              {/* <Link href={`/venues/${venue.id}`}>More details</Link> */}
+            </div>
           </Popup>
         </Marker>
       ))}
-      {/* Example of a single marker if no venues passed */}
+      {/* Example of a single marker if no venues passed and not loading */}
       {venues.length === 0 && (
          <Marker position={initialCenter}>
             <Popup>
-                PawsRoam Map Center! <br /> (Default: Tokyo)
+                PawsRoam Map Center! <br /> (No venues found for current filter)
             </Popup>
         </Marker>
       )}
