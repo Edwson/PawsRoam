@@ -1,0 +1,32 @@
+.adminNavLink {
+  display: block;
+  padding: 0.75rem 0.5rem; /* Added some horizontal padding */
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px; /* Added border-radius */
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.adminNavLink:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+  text-decoration: none; /* Ensure no underline on hover if not desired for these links */
+}
+
+.adminPageTitle {
+  margin-bottom: 1.5rem;
+  color: var(--primary-dark);
+  border-bottom: 1px solid var(--current-border-color);
+  padding-bottom: 0.5rem;
+}
+
+.adminSection {
+  background-color: var(--current-surface);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--current-border-color);
+}
