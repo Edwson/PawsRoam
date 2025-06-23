@@ -18,6 +18,8 @@ type Query {
   testGemini(prompt: String!): String # Test query for Gemini API
   searchVenues(filterByName: String, filterByType: String): [Venue!] # Query for venues
   myPets: [Pet!] # Query to get pets for the authenticated user
+  getReviewsForVenue(venueId: ID!): [Review!]
+  myReviews: [Review!]
 }
 
 type Mutation {
@@ -27,6 +29,34 @@ type Mutation {
   createPet(input: CreatePetInput!): Pet!
   updatePet(id: ID!, input: UpdatePetInput!): Pet
   deletePet(id: ID!): Boolean
+
+  addReview(input: CreateReviewInput!): Review!
+  updateReview(reviewId: ID!, input: UpdateReviewInput!): Review
+  deleteReview(reviewId: ID!): Boolean
+}
+
+type Review {
+  id: ID!
+  rating: Int!
+  comment: String
+  visit_date: String # e.g., "YYYY-MM-DD"
+  user: User! # The user who wrote the review
+  venue: Venue! # The venue being reviewed
+  created_at: String! # ISO8601 String
+  updated_at: String! # ISO8601 String
+}
+
+input CreateReviewInput {
+  venueId: ID!
+  rating: Int! # e.g., 1-5
+  comment: String
+  visit_date: String # e.g., "YYYY-MM-DD"
+}
+
+input UpdateReviewInput {
+  rating: Int
+  comment: String
+  visit_date: String # e.g., "YYYY-MM-DD"
 }
 
 type Pet {
@@ -96,10 +126,11 @@ type Venue {
   status: String # e.g., 'active', 'pending_approval'
   google_place_id: String
 
+  average_rating: Float # From venues table
+  review_count: Int   # From venues table
+
   created_at: String # Typically represented as ISO8601 String
   updated_at: String # Typically represented as ISO8601 String
-
-  # Future computed fields can be added here, e.g., averageRating
 }
 
 # Input type for filtering venues (optional for Phase 1 simple filter)
