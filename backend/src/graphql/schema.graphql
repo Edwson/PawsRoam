@@ -22,6 +22,7 @@ type Query {
   testGemini(prompt: String!): String # Test query for Gemini API
   searchVenues(filterByName: String, filterByType: String): [Venue!] # Query for venues
   myPets: [Pet!] # Query to get pets for the authenticated user
+  getPetById(id: ID!): Pet # Query to get a single pet by its ID, for editing
   getReviewsForVenue(venueId: ID!): [Review!]
   myReviews: [Review!]
 }
