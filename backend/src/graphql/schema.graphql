@@ -4,7 +4,11 @@ type User {
   id: ID!
   email: String!
   name: String
-  # Add other user fields as needed, e.g., createdAt
+  role: String!
+  status: String!
+  created_at: String # ISO8601 String for consistency
+  updated_at: String # ISO8601 String for consistency
+  # Add other user fields as needed
 }
 
 type AuthPayload {
