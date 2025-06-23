@@ -37,13 +37,13 @@ export const comparePassword = async (password: string, hash: string): Promise<b
 
 // Utility to get user ID from Authorization header (Bearer token)
 // This would typically be used in context creation for Apollo Server
-// export const getUserIdFromAuthHeader = (authHeader?: string): string | null => {
-//   if (authHeader) {
-//     const token = authHeader.replace('Bearer ', '');
-//     if (token) {
-//       const decoded = verifyToken(token);
-//       return decoded ? decoded.userId : null;
-//     }
-//   }
-//   return null;
-// };
+export const getUserIdFromAuthHeader = (authHeader?: string): string | null => {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.replace('Bearer ', '');
+    if (token) {
+      const decoded = verifyToken(token);
+      return decoded ? decoded.userId : null;
+    }
+  }
+  return null;
+};

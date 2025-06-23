@@ -49,14 +49,35 @@ interface DbVenue {
   updated_at: Date;
 }
 
+interface DbPet {
+    id: string; // UUID
+    user_id: string; // UUID
+    name: string;
+    species: string;
+    breed?: string | null;
+    birthdate?: Date | null; // Comes as Date from DB
+    avatar_url?: string | null;
+    notes?: string | null;
+    created_at: Date;
+    updated_at: Date;
+}
+
+// Define context type for resolvers
+interface ResolverContext {
+  userId?: string | null; // userId will be injected from Apollo Server context
+}
 
 interface Resolvers {
   Query: {
-    [key: string]: (...args: any[]) => any;
+    [key: string]: (parent: any, args: any, context: ResolverContext, info: any) => any;
   };
   Mutation?: {
-    [key: string]: (...args: any[]) => any;
+    [key: string]: (parent: any, args: any, context: ResolverContext, info: any) => any;
   };
+  // Add other types like Pet if they have field resolvers
+  // Pet?: {
+  //   owner?: (parent: DbPet, args: any, context: ResolverContext, info: any) => any;
+  // };
 }
 
 export const resolvers: Resolvers = {
@@ -66,6 +87,30 @@ export const resolvers: Resolvers = {
     //   if (!context.userId) throw new GraphQLError('Not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
     //   return usersDB.find(user => user.id === context.userId); // This would need to query DB users now
     // }
+    myPets: async (_parent: any, _args: any, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', {
+          extensions: { code: 'UNAUTHENTICATED' },
+        });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        const result = await pgPool.query<DbPet>('SELECT * FROM pets WHERE user_id = $1 ORDER BY created_at DESC', [context.userId]);
+        return result.rows.map(pet => ({
+          ...pet,
+          birthdate: pet.birthdate ? pet.birthdate.toISOString().split('T')[0] : null, // Format date as YYYY-MM-DD
+          created_at: pet.created_at.toISOString(),
+          updated_at: pet.updated_at.toISOString(),
+        }));
+      } catch (dbError: any) {
+        console.error("Error fetching pets:", dbError);
+        throw new GraphQLError('Failed to fetch pets.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
     searchVenues: async (_: any, { filterByName, filterByType }: { filterByName?: string, filterByType?: string }) => {
       if (!pgPool) {
         throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
@@ -193,6 +238,121 @@ export const resolvers: Resolvers = {
         token,
         user: { id: user.id, email: user.email, name: user.name || undefined },
       };
+    },
+
+    createPet: async (_parent: any, { input }: { input: any }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      const { name, species, breed, birthdate, avatar_url, notes } = input;
+      const query = `
+        INSERT INTO pets (user_id, name, species, breed, birthdate, avatar_url, notes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *;
+      `;
+      const values = [context.userId, name, species, breed, birthdate, avatar_url, notes];
+      try {
+        const result = await pgPool.query<DbPet>(query, values);
+        const newPet = result.rows[0];
+        return {
+          ...newPet,
+          birthdate: newPet.birthdate ? newPet.birthdate.toISOString().split('T')[0] : null,
+          created_at: newPet.created_at.toISOString(),
+          updated_at: newPet.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error creating pet:", dbError);
+        throw new GraphQLError('Failed to create pet.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    updatePet: async (_parent: any, { id, input }: { id: string, input: any }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+
+      const { name, species, breed, birthdate, avatar_url, notes } = input;
+
+      // Check if pet exists and belongs to the user
+      const existingPetResult = await pgPool.query<DbPet>('SELECT user_id FROM pets WHERE id = $1', [id]);
+      if (existingPetResult.rows.length === 0) {
+        throw new GraphQLError('Pet not found', { extensions: { code: 'NOT_FOUND' } });
+      }
+      if (existingPetResult.rows[0].user_id !== context.userId) {
+        throw new GraphQLError('User not authorized to update this pet', { extensions: { code: 'FORBIDDEN' } });
+      }
+
+      // Dynamically build the SET part of the query
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      let valueCount = 1;
+
+      if (name !== undefined) { setClauses.push(`name = $${valueCount++}`); values.push(name); }
+      if (species !== undefined) { setClauses.push(`species = $${valueCount++}`); values.push(species); }
+      if (breed !== undefined) { setClauses.push(`breed = $${valueCount++}`); values.push(breed); }
+      if (birthdate !== undefined) { setClauses.push(`birthdate = $${valueCount++}`); values.push(birthdate); } // Allow null
+      if (avatar_url !== undefined) { setClauses.push(`avatar_url = $${valueCount++}`); values.push(avatar_url); } // Allow null
+      if (notes !== undefined) { setClauses.push(`notes = $${valueCount++}`); values.push(notes); } // Allow null
+
+      if (setClauses.length === 0) {
+        throw new GraphQLError('No update fields provided', { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+
+      setClauses.push(`updated_at = CURRENT_TIMESTAMP`); // Always update this
+
+      const query = `
+        UPDATE pets SET ${setClauses.join(', ')}
+        WHERE id = $${valueCount++} AND user_id = $${valueCount++}
+        RETURNING *;
+      `;
+      values.push(id, context.userId);
+
+      try {
+        const result = await pgPool.query<DbPet>(query, values);
+        if (result.rows.length === 0) {
+          // Should not happen if initial check passed, but good for safety
+          throw new GraphQLError('Pet not found or update failed', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const updatedPet = result.rows[0];
+        return {
+          ...updatedPet,
+          birthdate: updatedPet.birthdate ? updatedPet.birthdate.toISOString().split('T')[0] : null,
+          created_at: updatedPet.created_at.toISOString(),
+          updated_at: updatedPet.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error updating pet:", dbError);
+        throw new GraphQLError('Failed to update pet.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    deletePet: async (_parent: any, { id }: { id: string }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      const query = 'DELETE FROM pets WHERE id = $1 AND user_id = $2 RETURNING id;';
+      try {
+        const result = await pgPool.query(query, [id, context.userId]);
+        return result.rowCount === 1; // True if one row was deleted
+      } catch (dbError: any) {
+        console.error("Error deleting pet:", dbError);
+        throw new GraphQLError('Failed to delete pet.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
     },
   },
 };

@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { resolvers } from './graphql/resolvers';
-// import { getUserIdFromAuthHeader } from './utils/auth'; // For context
+import { getUserIdFromAuthHeader } from './utils/auth'; // For context
+import { ExpressContext } from 'apollo-server-express'; // For typing req
 
 dotenv.config();
 
@@ -17,11 +18,12 @@ async function startServer() {
   const server = new ApolloServer({
     typeDefs,
     resolvers,
-    // context: ({ req }) => { // Example of setting context for authentication
-    //   const token = req.headers.authorization || '';
-    //   const userId = getUserIdFromAuthHeader(token);
-    //   return { userId };
-    // },
+    context: ({ req }: ExpressContext) => { // Example of setting context for authentication
+      const token = req.headers.authorization || '';
+      const userId = getUserIdFromAuthHeader(token);
+      // console.log("Context created with userId:", userId); // For debugging
+      return { userId }; // Add userId to the context
+    },
   });
 
   await server.start();
