@@ -1,0 +1,194 @@
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  /* Inspired by biophilic design: calming, natural tones */
+  --primary-color: #4CAF50; /* Green - nature, growth */
+  --primary-dark: #388E3C;
+  --primary-light: #C8E6C9;
+  --secondary-color: #FF9800; /* Orange - warmth, energy (use sparingly) */
+  --accent-color: #03A9F4; /* Light Blue - sky, water, calm */
+
+  --text-color-light: #F5F5F5; /* For dark backgrounds */
+  --text-color-dark: #212121;  /* For light backgrounds */
+  --text-color-muted: #757575;
+
+  --background-light: #F5F5F5; /* Off-white, soft */
+  --background-dark: #121212;  /* Dark grey, not pure black */
+  --surface-light: #FFFFFF; /* For cards, modals on light bg */
+  --surface-dark: #1E1E1E;  /* For cards, modals on dark bg */
+
+  --border-color-light: #E0E0E0;
+  --border-color-dark: #424242;
+
+  --font-family-sans: var(--font-geist-sans, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
+  --font-family-mono: var(--font-geist-mono, "Courier New", Courier, monospace);
+
+  /* Default to light theme variables */
+  --current-background: var(--background-light);
+  --current-foreground: var(--text-color-dark);
+  --current-surface: var(--surface-light);
+  --current-border-color: var(--border-color-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --current-background: var(--background-dark);
+    --current-foreground: var(--text-color-light);
+    --current-surface: var(--surface-dark);
+    --current-border-color: var(--border-color-dark);
+  }
+}
+
+html,
+body {
+  height: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--font-family-sans);
+  line-height: 1.6;
+}
+
+body {
+  color: var(--current-foreground);
+  background-color: var(--current-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0; /* Reset body margin */
+  padding: 0; /* Reset body padding */
+}
+
+* {
+  box-sizing: border-box;
+  /* Removed global padding and margin reset from here, apply as needed */
+}
+
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: var(--current-foreground);
+}
+
+h1 { font-size: 2.2rem; }
+h2 { font-size: 1.8rem; }
+h3 { font-size: 1.5rem; }
+
+p {
+  margin-bottom: 1rem;
+}
+
+/* Basic Form Styling */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--current-border-color);
+  border-radius: 4px;
+  background-color: var(--current-surface);
+  color: var(--current-foreground);
+  font-family: var(--font-family-sans);
+  font-size: 1rem;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+button,
+a.button-style { /* Allow links to be styled as buttons */
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--primary-color);
+  color: var(--text-color-light);
+  font-family: var(--font-family-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  text-decoration: none; /* For a.button-style */
+}
+
+button:hover,
+a.button-style:hover {
+  background-color: var(--primary-dark);
+  color: var(--text-color-light); /* Ensure text color remains light */
+  text-decoration: none; /* For a.button-style */
+}
+
+button:disabled {
+  background-color: var(--text-color-muted);
+  cursor: not-allowed;
+}
+
+/* Utility classes (optional, can be expanded) */
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.error-message {
+  color: #D32F2F; /* Red for errors */
+  background-color: #FFCDD2; /* Light red background */
+  padding: 0.75rem;
+  border: 1px solid #D32F2F;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+/* Ensure Leaflet map popups inherit some global styles if needed */
+.leaflet-popup-content-wrapper {
+  background: var(--current-surface);
+  color: var(--current-foreground);
+  border-radius: 4px;
+}
+.leaflet-popup-content p {
+  margin: 0.5em 0; /* Adjust paragraph margin inside popups */
+}
+.leaflet-popup-tip {
+   background: var(--current-surface);
+}
+
+/* Dark mode specific Leaflet overrides if necessary */
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile {
+    /* filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7); */
+    /* Example dark mode tile filter - can be aggressive */
+  }
+}
