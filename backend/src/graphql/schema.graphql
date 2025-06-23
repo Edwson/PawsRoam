@@ -1,0 +1,53 @@
+# GraphQL Schema for PawsRoam
+
+type User {
+  id: ID!
+  email: String!
+  name: String
+  # Add other user fields as needed, e.g., createdAt
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+type Query {
+  _empty: String # Placeholder to ensure Query type is valid
+  # me: User # Example query to get current user
+  testGemini(prompt: String!): String # Test query for Gemini API
+  searchVenues(filterByName: String, filterByType: String): [Venue!] # Query for venues
+}
+
+type Mutation {
+  registerUser(email: String!, password: String!, name: String): AuthPayload!
+  loginUser(email: String!, password: String!): AuthPayload!
+}
+
+# Example Types (will be expanded later)
+# type Pet {
+#   id: ID!
+#   name: String!
+#   breed: String
+#   owner: User!
+# }
+
+type Venue {
+  id: ID!
+  name: String!
+  address: String # Simplified for now, could be more structured
+  latitude: Float!
+  longitude: Float!
+  type: String # e.g., "cafe", "park", "store"
+  description: String
+  # Add more fields as per README's VenueData, e.g.:
+  # hyperDetailedPolicies: PolicyMatrix
+  # realTimeAvailability: LiveStatus
+  # pawStarRating: CommunityVerification
+}
+
+# Input type for filtering venues (optional for Phase 1 simple filter)
+# input VenueFilterInput {
+#   type: String
+#   # other filter criteria like amenities, ratings etc.
+# }
