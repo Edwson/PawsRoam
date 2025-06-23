@@ -115,7 +115,42 @@ END
 $$;
 
 
--- Add more tables as needed (Pets, Reviews, Images, Favorites, Awards etc. from user's schema)
+-- Pets Table
+-- Stores information about user's pets.
+CREATE TABLE IF NOT EXISTS pets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Each pet must belong to a user
+    name VARCHAR(100) NOT NULL,
+    species VARCHAR(50) NOT NULL, -- e.g., 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'
+    breed VARCHAR(100), -- Optional
+    birthdate DATE, -- Optional
+    avatar_url VARCHAR(255), -- Optional, URL to an image of the pet
+    notes TEXT, -- Optional, for any extra details about the pet
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookup of pets by user
+CREATE INDEX IF NOT EXISTS idx_pets_user_id ON pets(user_id);
+
+-- Apply the updated_at trigger to pets table
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'set_pets_updated_at' AND tgrelid = 'pets'::regclass
+  ) THEN
+    CREATE TRIGGER set_pets_updated_at
+    BEFORE UPDATE ON pets
+    FOR EACH ROW
+    EXECUTE FUNCTION trigger_set_timestamp();
+  END IF;
+END
+$$;
+
+
+-- Add more tables as needed (Reviews, Images, Favorites, Awards etc. from user's schema)
 
 -- Initial data (optional examples)
 /*

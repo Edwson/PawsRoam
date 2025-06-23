@@ -17,20 +17,49 @@ type Query {
   # me: User # Example query to get current user
   testGemini(prompt: String!): String # Test query for Gemini API
   searchVenues(filterByName: String, filterByType: String): [Venue!] # Query for venues
+  myPets: [Pet!] # Query to get pets for the authenticated user
 }
 
 type Mutation {
   registerUser(email: String!, password: String!, name: String): AuthPayload!
   loginUser(email: String!, password: String!): AuthPayload!
+
+  createPet(input: CreatePetInput!): Pet!
+  updatePet(id: ID!, input: UpdatePetInput!): Pet
+  deletePet(id: ID!): Boolean
 }
 
-# Example Types (will be expanded later)
-# type Pet {
-#   id: ID!
-#   name: String!
-#   breed: String
-#   owner: User!
-# }
+type Pet {
+  id: ID!
+  user_id: ID! # The user this pet belongs to
+  name: String!
+  species: String! # e.g., "Dog", "Cat"
+  breed: String
+  birthdate: String # Represent date as ISO8601 String e.g. "YYYY-MM-DD"
+  avatar_url: String
+  notes: String
+  created_at: String # ISO8601 String
+  updated_at: String # ISO8601 String
+  # owner: User! # Could resolve the User object if needed
+}
+
+input CreatePetInput {
+  name: String!
+  species: String!
+  breed: String
+  birthdate: String # e.g., "YYYY-MM-DD"
+  avatar_url: String
+  notes: String
+}
+
+input UpdatePetInput {
+  name: String
+  species: String
+  breed: String
+  birthdate: String # e.g., "YYYY-MM-DD"
+  avatar_url: String
+  notes: String
+}
 
 scalar JSON # For opening_hours
 
