@@ -80,9 +80,10 @@ CREATE TABLE IF NOT EXISTS venues (
     carrier_required BOOLEAN DEFAULT FALSE,
     additional_pet_services TEXT,
 
-    -- Rating & Status (simplified)
-    -- average_rating DECIMAL(3,2) DEFAULT 0.00, -- Could be calculated or from a reviews table
-    -- review_count INT DEFAULT 0,
+    -- Rating fields
+    average_rating DECIMAL(3,2) DEFAULT 0.00,
+    review_count INTEGER DEFAULT 0,
+
     status VARCHAR(50) DEFAULT 'active', -- e.g., 'active', 'pending_approval', 'temporarily_closed'
 
     google_place_id VARCHAR(255) UNIQUE, -- Optional: for linking with Google Places
@@ -150,7 +151,42 @@ END
 $$;
 
 
--- Add more tables as needed (Reviews, Images, Favorites, Awards etc. from user's schema)
+-- Reviews Table
+-- Stores user reviews for venues.
+CREATE TABLE IF NOT EXISTS reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    venue_id UUID NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    visit_date DATE, -- Optional: when the user visited the venue
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_venue_review UNIQUE (user_id, venue_id) -- Allow only one review per user per venue
+);
+
+-- Indexes for faster lookup of reviews
+CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_venue_id ON reviews(venue_id);
+
+-- Apply the updated_at trigger to reviews table
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'set_reviews_updated_at' AND tgrelid = 'reviews'::regclass
+  ) THEN
+    CREATE TRIGGER set_reviews_updated_at
+    BEFORE UPDATE ON reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION trigger_set_timestamp();
+  END IF;
+END
+$$;
+
+
+-- Add more tables as needed (Images, Favorites, Awards etc. from user's schema)
 
 -- Initial data (optional examples)
 /*
