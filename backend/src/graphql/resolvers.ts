@@ -9,6 +9,8 @@ interface DbUser {
   email: string;
   name?: string | null; // Nullable in DB
   password_hash: string;
+  role: string; // Added role
+  status: string; // Added status
   created_at: Date;
   updated_at: Date;
 }
@@ -451,34 +453,78 @@ export const resolvers: Resolvers = {
   },
   Mutation: {
     // ... (existing user and pet mutations) ...
-    registerUser: async (_: any, { email, password, name }: { email: string, password: string, name?: string }, context: ResolverContext) => {
-      // ... (implementation from previous step)
-      if (!pgPool) { throw new GraphQLError('DB error'); }
-      const existingUserResult = await pgPool.query<DbUser>('SELECT * FROM users WHERE email = $1', [email]);
+    registerUser: async (_parent: any, { email, password, name }: { email: string, password: string, name?: string }, context: ResolverContext) => {
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      const existingUserResult = await pgPool.query<DbUser>('SELECT id FROM users WHERE email = $1', [email]);
       if (existingUserResult.rows.length > 0) {
         throw new GraphQLError('Email already in use', { extensions: { code: 'BAD_USER_INPUT' } });
       }
       const passwordHash = await hashPassword(password);
-      const insertQuery = 'INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id, email, name';
+      // Add default role 'user' and status 'active'
+      const insertQuery = `
+        INSERT INTO users (email, name, password_hash, role, status)
+        VALUES ($1, $2, $3, 'user', 'active')
+        RETURNING id, email, name, role, status, created_at, updated_at;
+      `;
       const values = [email, name || null, passwordHash];
-      const newUserResult = await pgPool.query<DbUser>(insertQuery, values);
-      const newUser = newUserResult.rows[0];
-      const token = generateToken({ id: newUser.id, email: newUser.email });
-      return { token, user: { id: newUser.id, email: newUser.email, name: newUser.name || undefined } };
+      try {
+        const newUserResult = await pgPool.query<DbUser>(insertQuery, values);
+        const newUser = newUserResult.rows[0];
+        const token = generateToken({ id: newUser.id, email: newUser.email });
+        return {
+          token,
+          user: {
+            id: newUser.id,
+            email: newUser.email,
+            name: newUser.name,
+            role: newUser.role,
+            status: newUser.status,
+            created_at: newUser.created_at.toISOString(),
+            updated_at: newUser.updated_at.toISOString(),
+          },
+        };
+      } catch (dbError: any) {
+        console.error("Error registering user in DB:", dbError);
+        throw new GraphQLError('Failed to register user.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
     },
-    loginUser: async (_: any, { email, password }: { email: string, password: string }, context: ResolverContext) => {
-      // ... (implementation from previous step)
-      if (!pgPool) { throw new GraphQLError('DB error'); }
-      const result = await pgPool.query<DbUser>('SELECT * FROM users WHERE email = $1', [email]);
+    loginUser: async (_parent: any, { email, password }: { email: string, password: string }, context: ResolverContext) => {
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      // Select all necessary fields including role and status
+      const result = await pgPool.query<DbUser>('SELECT id, email, name, password_hash, role, status, created_at, updated_at FROM users WHERE email = $1', [email]);
       const user = result.rows[0];
-      if (!user) { throw new GraphQLError('Invalid credentials', { extensions: { code: 'UNAUTHENTICATED' } }); }
+      if (!user) {
+        throw new GraphQLError('Invalid email or password', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+       if (user.status === 'suspended') {
+        throw new GraphQLError('Account is suspended.', { extensions: { code: 'FORBIDDEN' } });
+      }
       const isValidPassword = await comparePassword(password, user.password_hash);
-      if (!isValidPassword) { throw new GraphQLError('Invalid credentials', { extensions: { code: 'UNAUTHENTICATED' } }); }
+      if (!isValidPassword) {
+        throw new GraphQLError('Invalid email or password', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
       const token = generateToken({ id: user.id, email: user.email });
-      return { token, user: { id: user.id, email: user.email, name: user.name || undefined } };
+      return {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          status: user.status,
+          created_at: user.created_at.toISOString(),
+          updated_at: user.updated_at.toISOString(),
+        },
+      };
     },
     createPet: async (_parent: any, { input }: { input: any }, context: ResolverContext) => {
-      // ... (implementation from previous step)
+      // ... (implementation from previous step, no changes needed here for user role/status)
       if (!context.userId) { throw new GraphQLError('Not authenticated', { extensions: { code: 'UNAUTHENTICATED' } }); }
       if (!pgPool) { throw new GraphQLError('DB error'); }
       const { name, species, breed, birthdate, avatar_url, notes } = input;

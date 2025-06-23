@@ -13,12 +13,16 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255),
     password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'user', -- Roles: 'user', 'admin', 'business_owner', 'paws_safer'
+    status VARCHAR(50) NOT NULL DEFAULT 'active', -- Statuses: 'active', 'pending_verification', 'suspended'
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Optional: Index on email for faster lookups
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role); -- Index for role
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status); -- Index for status
 
 -- Optional: Trigger to update 'updated_at' timestamp automatically
 CREATE OR REPLACE FUNCTION trigger_set_timestamp()

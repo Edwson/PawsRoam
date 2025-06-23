@@ -47,3 +47,44 @@ export const getUserIdFromAuthHeader = (authHeader?: string): string | null => {
   }
   return null;
 };
+
+import { GraphQLError } from 'graphql';
+import { pgPool } from '../config/db'; // For fetching user role
+import { ResolverContext } from '../graphql/resolvers'; // Assuming ResolverContext is exported or defined accessibly
+
+// Helper function to ensure the user is an admin
+export const ensureAdmin = async (context: ResolverContext): Promise<void> => {
+  if (!context.userId) {
+    throw new GraphQLError('User is not authenticated', {
+      extensions: { code: 'UNAUTHENTICATED' },
+    });
+  }
+
+  if (!pgPool) {
+    throw new GraphQLError('Database not configured', {
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+  }
+
+  try {
+    const userRoleResult = await pgPool.query('SELECT role FROM users WHERE id = $1', [context.userId]);
+    if (userRoleResult.rows.length === 0) {
+      throw new GraphQLError('User not found', { // Should not happen if JWT is valid and user exists
+        extensions: { code: 'INTERNAL_SERVER_ERROR' }, // Or NOT_FOUND
+      });
+    }
+    const userRole = userRoleResult.rows[0].role;
+    if (userRole !== 'admin') {
+      throw new GraphQLError('User is not authorized to perform this action', {
+        extensions: { code: 'FORBIDDEN' },
+      });
+    }
+    // If user is admin, function completes without throwing
+  } catch (error: any) {
+    if (error instanceof GraphQLError) throw error; // Re-throw GQL errors
+    console.error("Error checking admin status:", error);
+    throw new GraphQLError('Error verifying user authorization', {
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+  }
+};
