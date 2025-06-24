@@ -104,6 +104,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {user.role === 'business_owner' && (
                 <Link href="/shop-owner/dashboard" style={navLinkStyle}>Shop Dashboard</Link>
               )}
+              {user.role === 'paws_safer' && (
+                <Link href="/paws-safer/dashboard" style={navLinkStyle}>PawsSafer Zone</Link>
+              )}
               {user.role === 'admin' && (
                  <Link href="/admin" style={navLinkStyle}>Admin</Link>
               )}
