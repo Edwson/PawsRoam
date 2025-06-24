@@ -7,8 +7,20 @@ import ReviewModal from '@/components/modals/ReviewModal'; // Import ReviewModal
 
 // Define the GraphQL query for searching venues
 const SEARCH_VENUES_QUERY = gql`
-  query SearchVenues($filterByName: String, $filterByType: String) {
-    searchVenues(filterByName: $filterByName, filterByType: $filterByType) {
+  query SearchVenues(
+    $filterByName: String,
+    $filterByType: String,
+    $latitude: Float,
+    $longitude: Float,
+    $radiusKm: Float
+  ) {
+    searchVenues(
+      filterByName: $filterByName,
+      filterByType: $filterByType,
+      latitude: $latitude,
+      longitude: $longitude,
+      radiusKm: $radiusKm
+    ) {
       id
       name
       address
@@ -57,9 +69,12 @@ const MapPage = () => {
   const [isLocating, setIsLocating] = useState(false);
 
 
-  const [queryVariables, setQueryVariables] = useState({
+  const [queryVariables, setQueryVariables] = useState<any>({ // Added <any> for simplicity, define type if preferred
     filterByName: '',
     filterByType: '',
+    latitude: null,
+    longitude: null,
+    radiusKm: 10, // Default search radius in KM when location is used
   });
 
   // State for Review Modal
@@ -75,13 +90,31 @@ const MapPage = () => {
 
   useEffect(() => {
     const handler = setTimeout(() => {
-        setQueryVariables({
-            filterByName: searchTerm,
-            filterByType: filterType,
-        });
+      // Preserve existing location filters if user is only changing text/type filters
+      setQueryVariables(prev => ({
+        ...prev, // Keep existing lat, lng, radiusKm
+        filterByName: searchTerm,
+        filterByType: filterType,
+      }));
     }, 500);
     return () => clearTimeout(handler);
   }, [searchTerm, filterType]);
+
+  // Effect to update queryVariables when userLocation changes
+  useEffect(() => {
+    if (userLocation) {
+      setQueryVariables(prev => ({
+        ...prev, // Keep existing name/type filters
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        radiusKm: prev.radiusKm || 10, // Use existing radius or default to 10km
+      }));
+    }
+    // If userLocation becomes null, we might want to clear geo-filters
+    // else {
+    //   setQueryVariables(prev => ({ ...prev, latitude: null, longitude: null, radiusKm: null }));
+    // }
+  }, [userLocation]);
 
   const handleOpenReviewModal = (venueId: string, venueName: string) => {
     setSelectedVenueForReviews({ id: venueId, name: venueName });
