@@ -75,6 +75,17 @@ interface DbReview {
     updated_at: Date;
 }
 
+interface DbVenueClaim {
+    id: string; // UUID
+    venue_id: string; // UUID
+    user_id: string; // UUID
+    status: string; // 'pending', 'approved', 'rejected', 'cancelled'
+    claim_message?: string | null;
+    admin_notes?: string | null;
+    created_at: Date;
+    updated_at: Date;
+}
+
 // Define context type for resolvers
 interface ResolverContext {
   userId?: string | null; // userId will be injected from Apollo Server context
@@ -130,6 +141,10 @@ interface Resolvers {
   Venue?: { // Field resolvers for Venue type
     reviews: (parent: DbVenue, args: any, context: ResolverContext, info: any) => any;
   };
+  VenueClaim?: { // Field resolvers for VenueClaim type
+    user: (parent: DbVenueClaim, args: any, context: ResolverContext, info: any) => any;
+    venue: (parent: DbVenueClaim, args: any, context: ResolverContext, info: any) => any;
+  };
 }
 
 export const resolvers: Resolvers = {
@@ -159,6 +174,34 @@ export const resolvers: Resolvers = {
       } catch (dbError: any) {
         console.error("Error fetching pets:", dbError);
         throw new GraphQLError('Failed to fetch pets.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+    adminGetVenueClaims: async (_parent: any, { status }: { status?: string }, context: ResolverContext) => {
+      await ensureAdmin(context);
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        let query = 'SELECT * FROM venue_claims';
+        const values: string[] = [];
+        if (status) {
+          query += ' WHERE status = $1';
+          values.push(status);
+        }
+        query += ' ORDER BY created_at DESC;';
+
+        const result = await pgPool.query<DbVenueClaim>(query, values);
+        return result.rows.map(claim => ({
+          ...claim,
+          // user and venue fields will be resolved by VenueClaim field resolvers
+          created_at: claim.created_at.toISOString(),
+          updated_at: claim.updated_at.toISOString(),
+        }));
+      } catch (dbError: any) {
+        console.error("Error fetching venue claims:", dbError);
+        throw new GraphQLError('Failed to fetch venue claims.', {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
@@ -486,6 +529,118 @@ export const resolvers: Resolvers = {
         throw new GraphQLError('Failed to update user.', {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
+      }
+    },
+
+    requestVenueClaim: async (_parent: any, { input }: { input: { venueId: string, claimMessage?: string } }, context: ResolverContext) => {
+      const { userId, role } = await ensureShopOwnerOrAdmin(context); // Ensure user is shop_owner or admin
+      if (role !== 'business_owner' && role !== 'admin') { // Stricter check: only business_owner can claim. Admins manage claims.
+          throw new GraphQLError('Only Shop Owners can claim venues.', { extensions: { code: 'FORBIDDEN' } });
+      }
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      const { venueId, claimMessage } = input;
+
+      // Check if venue already has an owner
+      const venueOwnerCheck = await pgPool.query('SELECT owner_user_id FROM venues WHERE id = $1', [venueId]);
+      if (venueOwnerCheck.rows.length === 0) {
+        throw new GraphQLError('Venue not found.', { extensions: { code: 'NOT_FOUND' } });
+      }
+      if (venueOwnerCheck.rows[0].owner_user_id) {
+        throw new GraphQLError('This venue is already claimed or owned.', { extensions: { code: 'BAD_REQUEST' } });
+      }
+
+      // Check for existing pending claim by this user for this venue
+      const existingClaimCheck = await pgPool.query(
+        'SELECT id FROM venue_claims WHERE venue_id = $1 AND user_id = $2 AND status = $3',
+        [venueId, userId, 'pending']
+      );
+      if (existingClaimCheck.rows.length > 0) {
+        throw new GraphQLError('You already have a pending claim for this venue.', { extensions: { code: 'BAD_REQUEST' } });
+      }
+
+      try {
+        const result = await pgPool.query<DbVenueClaim>(
+          'INSERT INTO venue_claims (venue_id, user_id, claim_message, status) VALUES ($1, $2, $3, $4) RETURNING *',
+          [venueId, userId, claimMessage, 'pending']
+        );
+        const newClaim = result.rows[0];
+        return {
+          ...newClaim,
+          created_at: newClaim.created_at.toISOString(),
+          updated_at: newClaim.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error in requestVenueClaim:", dbError);
+        throw new GraphQLError('Failed to submit venue claim.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    adminReviewVenueClaim: async (_parent: any, { input }: { input: { claimId: string, newStatus: string, adminNotes?: string } }, context: ResolverContext) => {
+      await ensureAdmin(context);
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      const { claimId, newStatus, adminNotes } = input;
+      if (newStatus !== 'approved' && newStatus !== 'rejected') {
+        throw new GraphQLError("Invalid status. Must be 'approved' or 'rejected'.", { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+
+        const claimResult = await client.query<DbVenueClaim>(
+          'UPDATE venue_claims SET status = $1, admin_notes = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+          [newStatus, adminNotes, claimId]
+        );
+
+        if (claimResult.rows.length === 0) {
+          throw new GraphQLError('Venue claim not found.', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const updatedClaim = claimResult.rows[0];
+
+        if (newStatus === 'approved') {
+          // Check if venue is already owned by someone else before approving this claim.
+          const venueOwnerCheck = await client.query('SELECT owner_user_id FROM venues WHERE id = $1 FOR UPDATE', [updatedClaim.venue_id]);
+          if (venueOwnerCheck.rows.length === 0) throw new GraphQLError('Venue associated with claim not found.', { extensions: { code: 'INTERNAL_SERVER_ERROR' }}); // Should not happen due to FK
+          if (venueOwnerCheck.rows[0].owner_user_id && venueOwnerCheck.rows[0].owner_user_id !== updatedClaim.user_id) {
+             // Venue got claimed by someone else while this claim was pending. Reject this one.
+             await client.query(
+               'UPDATE venue_claims SET status = $1, admin_notes = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+               ['rejected', 'Venue was claimed by another user while this request was pending. ' + (adminNotes || ''), claimId]
+             );
+             updatedClaim.status = 'rejected';
+             updatedClaim.admin_notes = 'Venue was claimed by another user while this request was pending. ' + (adminNotes || '');
+          } else if (!venueOwnerCheck.rows[0].owner_user_id) {
+            // Venue is not owned, assign it
+            await client.query(
+              'UPDATE venues SET owner_user_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+              [updatedClaim.user_id, updatedClaim.venue_id]
+            );
+            // Optionally, reject other pending claims for this venue
+            await client.query(
+              "UPDATE venue_claims SET status = 'rejected', admin_notes = 'Venue has been awarded to another claimant.', updated_at = CURRENT_TIMESTAMP WHERE venue_id = $1 AND status = 'pending' AND id != $2",
+              [updatedClaim.venue_id, claimId]
+            );
+          }
+        }
+        await client.query('COMMIT');
+        return {
+          ...updatedClaim,
+          created_at: updatedClaim.created_at.toISOString(),
+          updated_at: new Date(updatedClaim.updated_at).toISOString(), // Ensure updated_at from DB is used
+        };
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        console.error("Error in adminReviewVenueClaim:", error);
+        if (error instanceof GraphQLError) throw error;
+        throw new GraphQLError('Failed to review venue claim.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: error.message },
+        });
+      } finally {
+        client.release();
       }
     },
 
@@ -1335,6 +1490,33 @@ export const resolvers: Resolvers = {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
+    }
+  },
+  VenueClaim: {
+    user: async (parent: DbVenueClaim, _args: any, _context: ResolverContext) => {
+      if (!pgPool) throw new GraphQLError('Database not configured');
+      const result = await pgPool.query<DbUser>('SELECT * FROM users WHERE id = $1', [parent.user_id]);
+      const dbUser = result.rows[0];
+      return dbUser ? {
+        ...dbUser,
+        created_at: dbUser.created_at.toISOString(),
+        updated_at: dbUser.updated_at.toISOString(),
+        // avatar_url: dbUser.avatar_url // if it exists on DbUser and User type
+      } : null;
+    },
+    venue: async (parent: DbVenueClaim, _args: any, _context: ResolverContext) => {
+      if (!pgPool) throw new GraphQLError('Database not configured');
+      const result = await pgPool.query<DbVenue>('SELECT * FROM venues WHERE id = $1', [parent.venue_id]);
+      const dbVenue = result.rows[0];
+      return dbVenue ? {
+        ...dbVenue,
+        latitude: parseFloat(dbVenue.latitude as any),
+        longitude: parseFloat(dbVenue.longitude as any),
+        weight_limit_kg: dbVenue.weight_limit_kg ? parseFloat(dbVenue.weight_limit_kg as any) : null,
+        created_at: dbVenue.created_at.toISOString(),
+        updated_at: dbVenue.updated_at.toISOString(),
+        // image_url: dbVenue.image_url // if it exists on DbVenue and Venue type
+      } : null;
     }
   }
 };

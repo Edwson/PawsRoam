@@ -28,7 +28,33 @@ type Query {
   myReviews: [Review!]
   getPetCareAdvice(question: String!): String! # AI Pet Care Q&A
   myOwnedVenues: [Venue!] # For shop owners to see their venues
+  adminGetVenueClaims(status: String): [VenueClaim!] # For admins to list claims
 }
+
+# Venue Claim Types
+type VenueClaim {
+  id: ID!
+  venue: Venue! # The venue being claimed
+  user: User!   # The user (shop owner) making the claim
+  status: String! # e.g., 'pending', 'approved', 'rejected', 'cancelled'
+  claim_message: String
+  admin_notes: String
+  created_at: String!
+  updated_at: String!
+}
+
+input RequestVenueClaimInput {
+  venueId: ID!
+  claimMessage: String # Optional message from the shop owner
+}
+
+# Input for admin to review a claim
+input AdminReviewVenueClaimInput {
+  claimId: ID!
+  newStatus: String! # Should be 'approved' or 'rejected' by admin
+  adminNotes: String # Optional notes from admin
+}
+
 
 type Mutation {
   registerUser(email: String!, password: String!, name: String): AuthPayload!
@@ -63,6 +89,10 @@ type Mutation {
   shopOwnerCreateVenue(input: AdminCreateVenueInput!): Venue! # Reusing AdminCreateVenueInput
   shopOwnerUpdateVenueDetails(venueId: ID!, input: ShopOwnerUpdateVenueInput!): Venue!
   shopOwnerUpdateVenueImage(venueId: ID!, imageUrl: String!): Venue!
+  requestVenueClaim(input: RequestVenueClaimInput!): VenueClaim!
+
+  # Admin mutations for venue claims
+  adminReviewVenueClaim(input: AdminReviewVenueClaimInput!): VenueClaim!
 }
 
 input ShopOwnerUpdateVenueInput {
