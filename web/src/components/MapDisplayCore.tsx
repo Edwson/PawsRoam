@@ -3,6 +3,7 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet'; // Import L for custom icons if needed later
+import Link from 'next/link'; // Import Link for navigation
 
 // Fix for default icon issue with Webpack/Next.js
 // (delete L.Icon.Default.prototype._getIconUrl; has been removed in recent Leaflet versions, direct path setting is better)
@@ -127,8 +128,20 @@ const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
                 View/Add Reviews
               </button>
 
-              {/* Add a link to a future venue details page */}
-              {/* <Link href={`/venues/${venue.id}`}>More details</Link> */}
+              <Link href={`/venues/${venue.id}`} passHref>
+                <a className="button-style" style={{
+                  fontSize: '0.9rem',
+                  padding: '0.3rem 0.6rem',
+                  marginTop: '0.5rem',
+                  marginLeft: '0.5rem', // Add some space between buttons
+                  textDecoration: 'none',
+                  display: 'inline-block', // Ensure it behaves like a button
+                  backgroundColor: 'var(--secondary-color)', // Different color for distinction
+                  color: 'white'
+                }}>
+                  View Details
+                </a>
+              </Link>
             </div>
           </Popup>
         </Marker>

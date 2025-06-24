@@ -127,6 +127,9 @@ interface Resolvers {
   // Pet?: {
   //   owner?: (parent: DbPet, args: any, context: ResolverContext, info: any) => any;
   // };
+  Venue?: { // Field resolvers for Venue type
+    reviews: (parent: DbVenue, args: any, context: ResolverContext, info: any) => any;
+  };
 }
 
 export const resolvers: Resolvers = {
@@ -156,6 +159,35 @@ export const resolvers: Resolvers = {
       } catch (dbError: any) {
         console.error("Error fetching pets:", dbError);
         throw new GraphQLError('Failed to fetch pets.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+    getVenueById: async (_parent: any, { id }: { id: string }, context: ResolverContext) => {
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        const result = await pgPool.query<DbVenue>('SELECT * FROM venues WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+          throw new GraphQLError('Venue not found', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const venue = result.rows[0];
+        return {
+          ...venue,
+          latitude: parseFloat(venue.latitude as any),
+          longitude: parseFloat(venue.longitude as any),
+          weight_limit_kg: venue.weight_limit_kg ? parseFloat(venue.weight_limit_kg as any) : null,
+          created_at: venue.created_at.toISOString(),
+          updated_at: venue.updated_at.toISOString(),
+          // Reviews will be resolved by the Venue.reviews field resolver
+        };
+      } catch (dbError: any) {
+        console.error(`Error fetching venue ${id}:`, dbError);
+        if (dbError.extensions?.code === 'NOT_FOUND') {
+            throw dbError;
+        }
+        throw new GraphQLError('Failed to fetch venue.', {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
@@ -721,6 +753,34 @@ export const resolvers: Resolvers = {
         created_at: venue.created_at.toISOString(),
         updated_at: venue.updated_at.toISOString(),
        } : null;
+    }
+  },
+  Venue: {
+    reviews: async (parent: DbVenue, _args: any, context: ResolverContext) => {
+      // This is the field resolver for Venue.reviews
+      // It uses the getReviewsForVenue resolver logic, but scoped to the parent venue.
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        // parent.id is the venue_id for which to fetch reviews
+        const result = await pgPool.query<DbReview>(
+          'SELECT * FROM reviews WHERE venue_id = $1 ORDER BY created_at DESC',
+          [parent.id]
+        );
+        return result.rows.map(review => ({
+          ...review,
+          visit_date: review.visit_date ? review.visit_date.toISOString().split('T')[0] : null,
+          created_at: review.created_at.toISOString(),
+          updated_at: review.updated_at.toISOString(),
+          // The 'user' and 'venue' fields for each Review will be resolved by their own field resolvers
+        }));
+      } catch (dbError: any) {
+        console.error(`Error fetching reviews for venue ${parent.id} in Venue.reviews resolver:`, dbError);
+        throw new GraphQLError('Failed to fetch reviews for venue.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
     }
   }
 };
