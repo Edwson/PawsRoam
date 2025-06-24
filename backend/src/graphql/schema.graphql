@@ -26,6 +26,7 @@ type Query {
   getVenueById(id: ID!): Venue # Query to get a single venue by its ID
   getReviewsForVenue(venueId: ID!): [Review!]
   myReviews: [Review!]
+  getPetCareAdvice(question: String!): String! # AI Pet Care Q&A
 }
 
 type Mutation {

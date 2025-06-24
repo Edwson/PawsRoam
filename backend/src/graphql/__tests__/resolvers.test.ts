@@ -646,4 +646,85 @@ describe('GraphQL Resolvers', () => {
       });
     });
   });
+
+  // Test for getPetCareAdvice
+  describe('Query Resolvers - PawsAI', () => {
+    const disclaimer = "\n\n--- \n**Disclaimer:** I am an AI assistant and this advice is for informational purposes only. It is not a substitute for professional veterinary consultation. Always consult a qualified veterinarian for any health concerns or before making any decisions related to your pet's health.";
+
+    describe('getPetCareAdvice', () => {
+      beforeEach(() => {
+        // Reset generateTextFromGemini mock specifically for these tests
+        (generateTextFromGemini as jest.Mock).mockReset();
+      });
+
+      it('should call generateTextFromGemini with correct prompt and append disclaimer', async () => {
+        process.env.GEMINI_API_KEY = 'test-key';
+        const question = "How often should I feed my puppy?";
+        const mockAdvice = "Puppies should be fed three to four times a day.";
+        (generateTextFromGemini as jest.Mock).mockResolvedValue(mockAdvice);
+
+        const result = await resolvers.Query.getPetCareAdvice(null, { question }, {}, {} as any);
+
+        expect(generateTextFromGemini).toHaveBeenCalledTimes(1);
+        const calledPrompt = (generateTextFromGemini as jest.Mock).mock.calls[0][0];
+        expect(calledPrompt).toContain(question);
+        expect(calledPrompt).toContain("You are PawsAI, a friendly and knowledgeable virtual pet care assistant");
+        expect(result).toBe(mockAdvice + disclaimer);
+      });
+
+      it('should return API key error message if not configured, with disclaimer', async () => {
+        delete process.env.GEMINI_API_KEY; // Ensure key is not set
+        const question = "Is chocolate bad for dogs?";
+
+        const result = await resolvers.Query.getPetCareAdvice(null, { question }, {}, {} as any);
+
+        expect(result).toBe("PawsAI Pet Care Advisor is currently unavailable (API key not configured)." + disclaimer); // Resolver prepends its own message here.
+        expect(generateTextFromGemini).not.toHaveBeenCalled();
+      });
+
+      it('should throw GraphQLError if question is empty', async () => {
+        process.env.GEMINI_API_KEY = 'test-key';
+        await expect(
+          resolvers.Query.getPetCareAdvice(null, { question: "  " }, {}, {} as any)
+        ).rejects.toThrow(new GraphQLError('Question cannot be empty.', { extensions: { code: 'BAD_USER_INPUT' }}));
+        expect(generateTextFromGemini).not.toHaveBeenCalled();
+      });
+
+      it('should handle Gemini API errors gracefully and append disclaimer', async () => {
+        process.env.GEMINI_API_KEY = 'test-key';
+        const question = "Why is the sky blue for my cat?";
+        const geminiErrorMessage = "Gemini API Error: Some specific error from Gemini.";
+        (generateTextFromGemini as jest.Mock).mockResolvedValue(geminiErrorMessage); // generateTextFromGemini itself returns a formatted error string
+
+        const result = await resolvers.Query.getPetCareAdvice(null, { question }, {}, {} as any);
+        expect(result).toBe(geminiErrorMessage + disclaimer);
+      });
+
+      it('should handle Gemini API throwing an actual error and append disclaimer to thrown GQL error', async () => {
+        process.env.GEMINI_API_KEY = 'test-key';
+        const question = "Why is the sky blue for my cat?";
+        const thrownErrorMessage = "Gemini API Error: Network issue.";
+        (generateTextFromGemini as jest.Mock).mockRejectedValue(new Error(thrownErrorMessage));
+
+        try {
+            await resolvers.Query.getPetCareAdvice(null, { question }, {}, {} as any);
+        } catch(e: any) {
+            expect(e).toBeInstanceOf(GraphQLError);
+            expect(e.message).toBe(thrownErrorMessage + disclaimer);
+            expect(e.extensions.code).toBe('INTERNAL_SERVER_ERROR');
+        }
+        expect.assertions(3);
+      });
+
+      it('should return a polite refusal if Gemini indicates it cannot answer, with disclaimer', async () => {
+        process.env.GEMINI_API_KEY = 'test-key';
+        const question = "A very complex medical question.";
+        const mockRefusal = "I'm unable to provide specific medical advice.";
+        (generateTextFromGemini as jest.Mock).mockResolvedValue(mockRefusal);
+
+        const result = await resolvers.Query.getPetCareAdvice(null, { question }, {}, {} as any);
+        expect(result).toBe("I'm sorry, I can't provide specific advice on that topic. For detailed pet care questions, especially regarding health, it's always best to consult a professional veterinarian." + disclaimer);
+      });
+    });
+  });
 });

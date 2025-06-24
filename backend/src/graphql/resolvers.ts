@@ -163,6 +163,56 @@ export const resolvers: Resolvers = {
         });
       }
     },
+    getPetCareAdvice: async (_: any, { question }: { question: string }) => {
+      if (!process.env.GEMINI_API_KEY) {
+        return "PawsAI Pet Care Advisor is currently unavailable (API key not configured).";
+      }
+      if (!question || question.trim() === "") {
+        throw new GraphQLError('Question cannot be empty.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      const disclaimer = "\n\n--- \n**Disclaimer:** I am an AI assistant and this advice is for informational purposes only. It is not a substitute for professional veterinary consultation. Always consult a qualified veterinarian for any health concerns or before making any decisions related to your pet's health.";
+
+      const prompt = `
+        You are PawsAI, a friendly and knowledgeable virtual pet care assistant for the PawsRoam platform.
+        A user has asked the following pet care question: "${question}"
+
+        Please provide a helpful, concise, and easy-to-understand answer based on general pet care knowledge.
+        If the question is about a serious medical issue, or if you are unsure, strongly recommend consulting a veterinarian.
+        If the question is nonsensical, irrelevant to pet care, or potentially harmful, politely decline to answer or provide a very generic helpful pet tip instead.
+        Keep your answer to a maximum of 3-4 paragraphs.
+
+        Your response should ONLY be the answer to the question.
+      `;
+
+      try {
+        const advice = await generateTextFromGemini(prompt);
+        if (advice.startsWith("Gemini API Error:") || advice.startsWith("Gemini API key not configured")) {
+            // If generateTextFromGemini itself returns an error message, pass it through
+            // but still append our specific disclaimer for pet care context.
+            return advice + disclaimer;
+        }
+        // Check for common refusal phrases if Gemini couldn't answer (this is a basic check)
+        const lowerCaseAdvice = advice.toLowerCase();
+        if (lowerCaseAdvice.includes("i cannot help with that") || lowerCaseAdvice.includes("i'm unable to provide") || lowerCaseAdvice.includes("i'm not able to")) {
+            return "I'm sorry, I can't provide specific advice on that topic. For detailed pet care questions, especially regarding health, it's always best to consult a professional veterinarian." + disclaimer;
+        }
+        return advice + disclaimer;
+      } catch (error: any) {
+        console.error("Error in getPetCareAdvice resolver:", error);
+        // The generateTextFromGemini function already formats errors, so we might just re-throw or return its message.
+        // However, to ensure our disclaimer is always there:
+        let errorMessage = "Sorry, I encountered an issue while trying to fetch advice. Please try again later.";
+        if (error.message && error.message.startsWith("Gemini API Error:")) {
+            errorMessage = error.message;
+        }
+        throw new GraphQLError(errorMessage + disclaimer, { // Append disclaimer even to GQL errors from this resolver
+            extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: error.message }
+        });
+      }
+    },
     getVenueById: async (_parent: any, { id }: { id: string }, context: ResolverContext) => {
       if (!pgPool) {
         throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
