@@ -202,6 +202,40 @@ export const resolvers: Resolvers = {
         });
       }
     },
+    getPetAlertById: async (_parent: any, { alertId }: { alertId: string }, context: ResolverContext) => {
+      // Any authenticated user can fetch an alert by ID, visibility of actions on frontend will depend on role.
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        const result = await pgPool.query<DbPetAlert>(
+          "SELECT * FROM pet_alerts WHERE id = $1",
+          [alertId]
+        );
+        if (result.rows.length === 0) {
+          return null; // Or throw NOT_FOUND error if preferred for non-existent ID
+        }
+        const alert = result.rows[0];
+        return {
+          ...alert,
+          latitude: parseFloat(alert.latitude as any),
+          longitude: parseFloat(alert.longitude as any),
+          last_seen_at: alert.last_seen_at ? alert.last_seen_at.toISOString() : null,
+          resolved_at: alert.resolved_at ? alert.resolved_at.toISOString() : null,
+          created_at: alert.created_at.toISOString(),
+          updated_at: alert.updated_at.toISOString(),
+          // createdByUser will be resolved by PetAlert field resolver
+        };
+      } catch (dbError: any) {
+        console.error(`Error fetching pet alert by ID (${alertId}):`, dbError);
+        throw new GraphQLError('Failed to fetch pet alert.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
     getActivePetAlerts: async (_parent: any, { latitude, longitude, radiusKm }: { latitude?: number, longitude?: number, radiusKm?: number }, context: ResolverContext) => {
       // For V1, geospatial filtering is not implemented. We'll just return active alerts.
       // Ensure user is authenticated, as this might be sensitive info or for specific roles in future.

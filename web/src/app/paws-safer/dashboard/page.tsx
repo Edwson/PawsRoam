@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { gql, useQuery, useMutation } from '@apollo/client';
 import Image from 'next/image'; // For pet images in alerts
+import Link from 'next/link'; // Import Link
 // PawsSaferLayout will handle AppProviders, Layout, and auth guard
 
 const defaultPetImage = "/default-pet-avatar.png"; // Fallback for pet images in alerts
@@ -185,13 +186,17 @@ const PawsSaferDashboardPageContent: React.FC = () => {
         <p>No active alerts at the moment. Great job, or a quiet day!</p>
       ) : (
         alerts.map(alert => (
-          <div key={alert.id} style={alertCardStyle}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem'}}>
-                <h3 style={{marginTop:0, marginBottom:'0.2rem', color: 'var(--accent-color)'}}>{alert.alert_type.replace('_', ' ').toUpperCase()} - {alert.pet_name || 'Unknown Pet'}</h3>
-                <span style={{fontSize:'0.8em', color: 'var(--text-color-muted)'}}>Reported: {new Date(alert.created_at).toLocaleDateString()}</span>
-            </div>
+          <Link key={alert.id} href={`/paws-safer/alerts/${alert.id}`} passHref style={{textDecoration: 'none', color: 'inherit'}}>
+            <div style={{...alertCardStyle, cursor: 'pointer', transition: 'box-shadow 0.2s ease'}}
+                 onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
+                 onMouseOut={(e) => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'}
+            >
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem'}}>
+                  <h3 style={{marginTop:0, marginBottom:'0.2rem', color: 'var(--accent-color)'}}>{alert.alert_type.replace('_', ' ').toUpperCase()} - {alert.pet_name || 'Unknown Pet'}</h3>
+                  <span style={{fontSize:'0.8em', color: 'var(--text-color-muted)'}}>Reported: {new Date(alert.created_at).toLocaleDateString()}</span>
+              </div>
 
-            {alert.pet_image_url && (
+              {alert.pet_image_url && (
                 <Image src={alert.pet_image_url} alt={alert.pet_name || 'Pet image'} width={100} height={100} style={{objectFit:'cover', borderRadius:'4px', float:'right', marginLeft:'1rem', marginBottom:'0.5rem'}} onError={(e) => {(e.target as HTMLImageElement).style.display='none'}} />
             )}
             <p><strong>Description:</strong> <span style={{whiteSpace: 'pre-wrap'}}>{alert.description}</span></p>
@@ -233,7 +238,8 @@ const PawsSaferDashboardPageContent: React.FC = () => {
                     />
                 </div>
             )}
-          </div>
+            </div>
+          </Link>
         ))
       )}
     </div>

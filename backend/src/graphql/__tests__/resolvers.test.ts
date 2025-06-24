@@ -1015,6 +1015,60 @@ describe('GraphQL Resolvers', () => {
             expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only ownership check
         });
     });
+
+    describe('getPetAlertById', () => {
+      const mockAlertId = 'alert-uuid-123';
+      const mockContext = { userId: 'user-abc' }; // Any authenticated user
+      const mockDbPetAlert = {
+        id: mockAlertId,
+        created_by_user_id: 'user-creator-id',
+        alert_type: 'lost_pet',
+        description: 'Lost black cat',
+        status: 'active',
+        latitude: '34.0522',
+        longitude: '-118.2437',
+        created_at: new Date('2023-04-01T10:00:00Z'),
+        updated_at: new Date('2023-04-01T11:00:00Z'),
+        last_seen_at: new Date('2023-04-01T09:00:00Z'),
+        resolved_at: null,
+      };
+      const expectedGqlPetAlert = {
+        ...mockDbPetAlert,
+        latitude: 34.0522,
+        longitude: -118.2437,
+        last_seen_at: mockDbPetAlert.last_seen_at.toISOString(),
+        resolved_at: null,
+        created_at: mockDbPetAlert.created_at.toISOString(),
+        updated_at: mockDbPetAlert.updated_at.toISOString(),
+      };
+
+      it('should return a pet alert if found', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockDbPetAlert] });
+        const result = await resolvers.Query.getPetAlertById!(null, { alertId: mockAlertId }, mockContext, {} as any);
+
+        expect(mockPgPoolQuery).toHaveBeenCalledWith("SELECT * FROM pet_alerts WHERE id = $1", [mockAlertId]);
+        expect(result).toEqual(expectedGqlPetAlert);
+      });
+
+      it('should return null if pet alert not found', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] });
+        const result = await resolvers.Query.getPetAlertById!(null, { alertId: 'non-existent-id' }, mockContext, {} as any);
+        expect(result).toBeNull();
+      });
+
+      it('should throw error if user is not authenticated', async () => {
+        await expect(
+          resolvers.Query.getPetAlertById!(null, { alertId: mockAlertId }, { userId: null } as any, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authenticated'));
+      });
+
+      it('should handle database errors', async () => {
+        mockPgPoolQuery.mockRejectedValueOnce(new Error('DB Error'));
+        await expect(
+          resolvers.Query.getPetAlertById!(null, { alertId: mockAlertId }, mockContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Failed to fetch pet alert.'));
+      });
+    });
   });
 
   // Test for getPetCareAdvice

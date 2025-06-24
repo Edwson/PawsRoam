@@ -37,6 +37,7 @@ type Query {
   adminGetVenueClaims(status: String): [VenueClaim!] # For admins to list claims
   getActivePetAlerts(latitude: Float, longitude: Float, radiusKm: Int): [PetAlert!] # For PawsSafers/admins
   getMyCreatedAlerts: [PetAlert!] # For users to see alerts they created
+  getPetAlertById(alertId: ID!): PetAlert # For viewing a specific alert's details
 }
 
 # Pet Alert Types
