@@ -1,0 +1,56 @@
+# netlify.toml
+
+# Build settings for the Next.js app.
+# If your Netlify site settings have "Base directory" set to "web/",
+# then the command and publish are relative to that.
+# If "Base directory" is repository root, command should be "cd web && npm run build".
+[build]
+  command = "npm run build" # Assumes Netlify "Base directory" is set to "web/" in the UI.
+  publish = ".next/"      # Publish directory relative to the "Base directory" ("web/").
+
+# Essential plugin for Next.js on Netlify.
+# This plugin handles most of the Next.js specific configurations,
+# including server-side rendering, API routes, image optimization, etc.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Environment variables can be set here, but sensitive ones
+# (like API keys, DB credentials) should be set in the Netlify UI.
+# [build.environment]
+#   NEXT_PUBLIC_GRAPHQL_ENDPOINT = "YOUR_GRAPHQL_ENDPOINT_HERE" # Example
+
+# Example of how you might set Node.js version if needed
+# [build.processing]
+#   [build.processing.css]
+#     bundle = true
+#     minify = true
+#   [build.processing.js]
+#     bundle = true
+#     minify = true
+#   [build.processing.html]
+#     pretty_urls = true
+#   [build.processing.images]
+#     compress = true
+
+# Context-specific settings can also be defined, e.g., for different branches
+# [context.production.environment]
+#   NEXT_PUBLIC_GRAPHQL_ENDPOINT = "YOUR_PRODUCTION_GRAPHQL_ENDPOINT"
+
+# [context.deploy-preview.environment]
+#   NEXT_PUBLIC_GRAPHQL_ENDPOINT = "YOUR_STAGING_GRAPHQL_ENDPOINT"
+
+# Redirects and rewrites are usually handled by the Next.js plugin.
+# If you need custom redirects beyond what Next.js provides (e.g., for marketing URLs),
+# you can add them here. For typical SPA/Next.js routing, the plugin suffices.
+# Example redirect:
+# [[redirects]]
+#   from = "/old-path"
+#   to = "/new-path"
+#   status = 301 # Permanent redirect
+
+# If you were not using the Next.js plugin, you might need a catch-all for SPAs:
+# [[redirects]]
+#  from = "/*"
+#  to = "/index.html" # Or your Next.js SSR handler
+#  status = 200
+# But with the plugin, this is generally not needed.
