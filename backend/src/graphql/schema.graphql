@@ -6,9 +6,9 @@ type User {
   name: String
   role: String!
   status: String!
+  avatar_url: String # URL to the user's avatar image
   created_at: String # ISO8601 String for consistency
   updated_at: String # ISO8601 String for consistency
-  # Add other user fields as needed
 }
 
 type AuthPayload {
@@ -44,6 +44,9 @@ type Mutation {
   adminCreateVenue(input: AdminCreateVenueInput!): Venue!
   adminUpdateVenue(id: ID!, input: AdminUpdateVenueInput!): Venue
   adminDeleteVenue(id: ID!): Boolean
+
+  # User profile mutations
+  updateUserProfilePicture(imageUrl: String!): User!
 }
 
 input AdminCreateVenueInput {

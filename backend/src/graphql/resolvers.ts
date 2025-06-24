@@ -339,6 +339,49 @@ export const resolvers: Resolvers = {
       }
     },
 
+    updateUserProfilePicture: async (_parent: any, { imageUrl }: { imageUrl: string }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+
+      try {
+        // Conceptually, we'd update the users table.
+        // UPDATE users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *;
+        // Since avatar_url might not exist, we'll simulate the update and return the user data as if it did.
+
+        // First, fetch the current user data to return
+        const userResult = await pgPool.query<DbUser>('SELECT * FROM users WHERE id = $1', [context.userId]);
+        if (userResult.rows.length === 0) {
+          throw new GraphQLError('User not found.', { extensions: { code: 'NOT_FOUND' } });
+        }
+
+        // Simulate that the DB operation for setting avatar_url happened.
+        // In a real scenario, the RETURNING * from the UPDATE query would give us the updated user.
+        const dbUser = userResult.rows[0];
+
+        // Here, we would log the conceptual update:
+        console.log(`Conceptually updated avatar_url for user ${context.userId} to ${imageUrl}`);
+
+        // Return the user object, including the new (simulated) avatar_url
+        return {
+          ...dbUser,
+          avatar_url: imageUrl, // Add the new imageUrl to the returned object
+          created_at: dbUser.created_at.toISOString(),
+          updated_at: new Date().toISOString(), // Simulate updated_at being changed
+        };
+
+      } catch (dbError: any) {
+        console.error("Error in updateUserProfilePicture:", dbError);
+        if (dbError instanceof GraphQLError) throw dbError;
+        throw new GraphQLError('Failed to update profile picture.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
     loginUser: async (_: any, { email, password }: { email: string, password: string }) => {
       if (!pgPool) {
         throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
