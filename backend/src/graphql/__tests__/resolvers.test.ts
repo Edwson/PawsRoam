@@ -1,5 +1,6 @@
 import { resolvers } from '../resolvers'; // Adjust path
 import { generateTextFromGemini } from '../../utils/gemini'; // Adjust path
+import { ensureShopOwnerOrAdmin } from '../../utils/auth'; // Import for mocking
 import { GraphQLError } from 'graphql';
 
 // Mock the generateTextFromGemini utility
@@ -15,14 +16,29 @@ jest.mock('../../config/db', () => ({
   },
 }));
 
+// Mock specific auth functions if they are used directly by resolvers being tested
+jest.mock('../../utils/auth', () => {
+  const originalAuth = jest.requireActual('../../utils/auth');
+  return {
+    ...originalAuth, // Preserve other exports from auth.ts
+    ensureAdmin: jest.fn(), // Mock ensureAdmin
+    ensureShopOwnerOrAdmin: jest.fn(), // Mock ensureShopOwnerOrAdmin
+  };
+});
+
 
 describe('GraphQL Resolvers', () => {
   const mockGenerateTextFromGemini = generateTextFromGemini as jest.Mock;
+  const mockEnsureAdmin = ensureAdmin as jest.Mock; // Typed mock
+  const mockEnsureShopOwnerOrAdmin = ensureShopOwnerOrAdmin as jest.Mock; // Typed mock
+
 
   beforeEach(() => {
     // Reset mocks before each test
     mockGenerateTextFromGemini.mockReset();
     mockPgPoolQuery.mockReset(); // Reset pgPool.query mock
+    mockEnsureAdmin.mockReset(); // Reset ensureAdmin mock
+    mockEnsureShopOwnerOrAdmin.mockReset(); // Reset ensureShopOwnerOrAdmin mock
     // Clear environment variables for GEMINI_API_KEY or set them as needed per test
     delete process.env.GEMINI_API_KEY;
   });
@@ -646,6 +662,61 @@ describe('GraphQL Resolvers', () => {
       });
     });
 
+    describe('myOwnedVenues', () => {
+      const mockShopOwnerContext = { userId: 'shop-owner-id-123' };
+      const mockAdminActingAsShopOwnerContext = { userId: 'admin-id-acting-as-shop-owner' };
+
+      const mockDbVenues = [
+        { id: 'venue-1', name: 'My Cafe', owner_user_id: 'shop-owner-id-123', latitude: '35.0', longitude: '139.0', created_at: new Date(), updated_at: new Date(), type: 'cafe' },
+        { id: 'venue-2', name: 'My Park', owner_user_id: 'shop-owner-id-123', latitude: '35.1', longitude: '139.1', created_at: new Date(), updated_at: new Date(), type: 'park' },
+      ];
+      const expectedGqlVenues = mockDbVenues.map(v => ({
+          ...v,
+          latitude: parseFloat(v.latitude),
+          longitude: parseFloat(v.longitude),
+          weight_limit_kg: null, // Assuming not in mockDbVenues
+          created_at: v.created_at.toISOString(),
+          updated_at: v.updated_at.toISOString(),
+          image_url: undefined, // Or null if that's the default
+      }));
+
+
+      it('should return venues owned by the authenticated shop owner', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue({ userId: mockShopOwnerContext.userId, role: 'business_owner' });
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: mockDbVenues });
+
+        const result = await resolvers.Query.myOwnedVenues!(null, {}, mockShopOwnerContext, {} as any);
+
+        expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockShopOwnerContext);
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM venues WHERE owner_user_id = $1 ORDER BY name ASC', [mockShopOwnerContext.userId]);
+        expect(result.length).toBe(2);
+        expect(result[0].name).toBe('My Cafe');
+        // Check a few transformed fields
+        expect(result[0].latitude).toBe(35.0);
+        expect(result[1].created_at).toBe(mockDbVenues[1].created_at.toISOString());
+      });
+
+      it('should allow admin to use myOwnedVenues (returns venues for that admin if they own any)', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue({ userId: mockAdminActingAsShopOwnerContext.userId, role: 'admin' });
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // Admin owns no venues in this test
+
+        const result = await resolvers.Query.myOwnedVenues!(null, {}, mockAdminActingAsShopOwnerContext, {} as any);
+
+        expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockAdminActingAsShopOwnerContext);
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM venues WHERE owner_user_id = $1 ORDER BY name ASC', [mockAdminActingAsShopOwnerContext.userId]);
+        expect(result).toEqual([]);
+      });
+
+      it('should throw error if user is not authenticated for myOwnedVenues', async () => {
+        mockEnsureShopOwnerOrAdmin.mockRejectedValue(new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' }}));
+
+        await expect(
+            resolvers.Query.myOwnedVenues!(null, {}, {userId: null} as any, {} as any)
+        ).rejects.toThrow('User is not authenticated');
+        expect(mockPgPoolQuery).not.toHaveBeenCalled();
+      });
+    });
+
     describe('adminUpdateUser', () => {
       const targetUserId = 'user-to-update-id';
       const updateInput = { role: 'business_owner', status: 'active' };
@@ -713,6 +784,76 @@ describe('GraphQL Resolvers', () => {
           resolvers.Mutation!.adminUpdateUser!(null, { userId: targetUserId, input: emailUpdateInput }, adminContext, {} as any)
         ).rejects.toThrow(new GraphQLError('Email address is already in use by another account.', { extensions: { code: 'BAD_USER_INPUT' }}));
       });
+    });
+
+    describe('shopOwnerCreateVenue', () => {
+        const mockShopOwnerContext = { userId: 'shop-owner-id-for-create', role: 'business_owner'};
+        const venueInput = { // AdminCreateVenueInput
+            name: "Shop Owner's New Cafe",
+            type: "cafe",
+            latitude: 36.0,
+            longitude: 140.0,
+            // ... other fields as per AdminCreateVenueInput, status can be omitted to test default
+        };
+        const dbResponseVenue = {
+            ...venueInput,
+            id: 'new-shop-venue-id',
+            owner_user_id: mockShopOwnerContext.userId, // This will be set by resolver
+            status: 'pending_approval', // Default status
+            created_at: new Date(),
+            updated_at: new Date(),
+            image_url: null, // Assuming new venues don't have image_url by default
+        };
+        const expectedGqlVenue = {
+            ...dbResponseVenue,
+            latitude: 36.0,
+            longitude: 140.0,
+            weight_limit_kg: null,
+            created_at: dbResponseVenue.created_at.toISOString(),
+            updated_at: dbResponseVenue.updated_at.toISOString(),
+            image_url: undefined, // Or null depending on GQL type and if it's in DbVenue
+        };
+
+        it('should allow a shop owner to create a venue, setting owner_user_id and default status', async () => {
+            mockEnsureShopOwnerOrAdmin.mockResolvedValue({ userId: mockShopOwnerContext.userId, role: 'business_owner' });
+            mockPgPoolQuery.mockResolvedValueOnce({ rows: [dbResponseVenue] });
+
+            const result = await resolvers.Mutation!.shopOwnerCreateVenue!(null, { input: venueInput }, mockShopOwnerContext, {} as any);
+
+            expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockShopOwnerContext);
+            expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // ensureShopOwnerOrAdmin is mocked not to call DB itself in this test setup
+
+            const dbCallArgs = mockPgPoolQuery.mock.calls[0][1];
+            expect(dbCallArgs[0]).toBe(mockShopOwnerContext.userId); // owner_user_id
+            expect(dbCallArgs[1]).toBe(venueInput.name); // name
+            expect(dbCallArgs[26]).toBe('pending_approval'); // status (assuming it's the 27th arg)
+
+            expect(result).toEqual(expectedGqlVenue);
+        });
+
+        it('should allow an admin to use shopOwnerCreateVenue, setting owner_user_id to admin ID', async () => {
+            const adminAsShopOwnerContext = { userId: 'admin-acting-as-creator', role: 'admin'};
+            mockEnsureShopOwnerOrAdmin.mockResolvedValue({ userId: adminAsShopOwnerContext.userId, role: 'admin' });
+            const adminOwnedDbResponse = {...dbResponseVenue, owner_user_id: adminAsShopOwnerContext.userId};
+            mockPgPoolQuery.mockResolvedValueOnce({ rows: [adminOwnedDbResponse] });
+
+            const result = await resolvers.Mutation!.shopOwnerCreateVenue!(null, { input: venueInput }, adminAsShopOwnerContext, {} as any);
+
+            expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(adminAsShopOwnerContext);
+            const dbCallArgs = mockPgPoolQuery.mock.calls[0][1];
+            expect(dbCallArgs[0]).toBe(adminAsShopOwnerContext.userId); // owner_user_id is admin's
+            expect(result.owner_user_id).toBe(adminAsShopOwnerContext.userId);
+        });
+
+        it('should throw error if a non-shop-owner/non-admin tries to create a venue', async () => {
+            const regularUserContext = { userId: 'regular-user-id', role: 'user'};
+            mockEnsureShopOwnerOrAdmin.mockRejectedValue(new GraphQLError('User is not authorized for this shop owner action', { extensions: { code: 'FORBIDDEN' }}));
+
+            await expect(
+                 resolvers.Mutation!.shopOwnerCreateVenue!(null, { input: venueInput }, regularUserContext, {} as any)
+            ).rejects.toThrow('User is not authorized for this shop owner action');
+            expect(mockPgPoolQuery).not.toHaveBeenCalled();
+        });
     });
   });
 

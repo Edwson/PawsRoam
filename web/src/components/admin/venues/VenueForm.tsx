@@ -18,9 +18,18 @@ const ADMIN_CREATE_VENUE_MUTATION = gql`
 const ADMIN_UPDATE_VENUE_MUTATION = gql`
   mutation AdminUpdateVenue($id: ID!, $input: AdminUpdateVenueInput!) {
     adminUpdateVenue(id: $id, input: $input) {
-      id # Request fields needed after update
+      id
       name
-      # Potentially all fields to update cache, or refetch
+    }
+  }
+`;
+
+const SHOP_OWNER_CREATE_VENUE_MUTATION = gql`
+  mutation ShopOwnerCreateVenue($input: AdminCreateVenueInput!) { # Reuses AdminCreateVenueInput
+    shopOwnerCreateVenue(input: $input) {
+      id
+      name
+      owner_user_id # Verify owner is set
     }
   }
 `;
@@ -64,7 +73,9 @@ const GET_VENUE_BY_ID_QUERY = gql`
 
 
 interface VenueFormProps {
-  venueId?: string; // If provided, it's an edit form
+  venueId?: string; // If provided, it's an edit form (for admin or future shop owner edit)
+  mutationType?: 'adminCreateVenue' | 'adminUpdateVenue' | 'shopOwnerCreateVenue'; // To control which mutation to use
+  onSuccess?: (data?: any) => void; // Optional callback on successful mutation
 }
 
 // Define initial state structure matching AdminCreateVenueInput but with appropriate defaults
@@ -100,9 +111,15 @@ const initialFormData: AdminCreateVenueInput = {
 };
 
 
-const VenueForm: React.FC<VenueFormProps> = ({ venueId }) => {
+const VenueForm: React.FC<VenueFormProps> = ({
+  venueId,
+  mutationType = venueId ? 'adminUpdateVenue' : 'adminCreateVenue', // Default mutation based on venueId
+  onSuccess,
+}) => {
   const router = useRouter();
   const isEditMode = !!venueId;
+  const isShopOwnerCreate = mutationType === 'shopOwnerCreateVenue';
+
   const [formData, setFormData] = useState<AdminCreateVenueInput | AdminUpdateVenueInput>(initialFormData);
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
@@ -147,23 +164,34 @@ const VenueForm: React.FC<VenueFormProps> = ({ venueId }) => {
     }
   );
 
-  const [adminCreateVenue, { loading: createLoading }] = useMutation(ADMIN_CREATE_VENUE_MUTATION, {
-    onCompleted: () => {
-      setFeedbackMessage({type: 'success', message: 'Venue created successfully! Redirecting...'});
-      setTimeout(() => router.push('/admin/venues'), 2000);
+  const [adminCreateVenue, { loading: adminCreateLoading }] = useMutation(ADMIN_CREATE_VENUE_MUTATION, {
+    onCompleted: (data) => {
+      setFeedbackMessage({type: 'success', message: 'Venue created successfully by admin! Redirecting...'});
+      if (onSuccess) onSuccess(data);
+      else setTimeout(() => router.push('/admin/venues'), 2000);
     },
     onError: (err) => setFeedbackMessage({type: 'error', message: `Error creating venue: ${err.message}`}),
   });
 
-  const [adminUpdateVenue, { loading: updateLoading }] = useMutation(ADMIN_UPDATE_VENUE_MUTATION, {
-    onCompleted: () => {
-      setFeedbackMessage({type: 'success', message: 'Venue updated successfully! Redirecting...'});
-      setTimeout(() => router.push('/admin/venues'), 2000);
+  const [adminUpdateVenue, { loading: adminUpdateLoading }] = useMutation(ADMIN_UPDATE_VENUE_MUTATION, {
+    onCompleted: (data) => {
+      setFeedbackMessage({type: 'success', message: 'Venue updated successfully by admin! Redirecting...'});
+      if (onSuccess) onSuccess(data);
+      else setTimeout(() => router.push('/admin/venues'), 2000);
     },
     onError: (err) => setFeedbackMessage({type: 'error', message: `Error updating venue: ${err.message}`}),
   });
 
-  const loading = createLoading || updateLoading || queryLoading;
+  const [shopOwnerCreateVenue, { loading: shopCreateLoading }] = useMutation(SHOP_OWNER_CREATE_VENUE_MUTATION, {
+    onCompleted: (data) => {
+      setFeedbackMessage({type: 'success', message: 'Your new venue has been submitted for approval!'});
+      if (onSuccess) onSuccess(data);
+      // Default redirect handled by onSuccess prop from AddVenueByShopOwnerPage
+    },
+    onError: (err) => setFeedbackMessage({type: 'error', message: `Error submitting venue: ${err.message}`}),
+  });
+
+  const loading = adminCreateLoading || adminUpdateLoading || shopCreateLoading || queryLoading;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -228,10 +256,16 @@ const VenueForm: React.FC<VenueFormProps> = ({ venueId }) => {
       // delete (updatePayload as any).id;
       // delete (updatePayload as any).created_at;
       // ...etc. for fields not in AdminUpdateVenueInput
-
+      // Note: For shop owner edits in future, this would be shopOwnerUpdateVenue
       adminUpdateVenue({ variables: { id: venueId, input: updatePayload } });
-    } else {
-      adminCreateVenue({ variables: { input: submissionData as AdminCreateVenueInput } });
+    } else { // Create mode
+      if (mutationType === 'shopOwnerCreateVenue') {
+        // For shop owner, owner_user_id is set by backend, so remove it from input if present
+        const { owner_user_id, ...shopOwnerSubmissionData } = submissionData;
+        shopOwnerCreateVenue({ variables: { input: shopOwnerSubmissionData as AdminCreateVenueInput } });
+      } else { // Default to adminCreateVenue
+        adminCreateVenue({ variables: { input: submissionData as AdminCreateVenueInput } });
+      }
     }
   };
 
@@ -402,9 +436,21 @@ const VenueForm: React.FC<VenueFormProps> = ({ venueId }) => {
         <input type="text" name="google_place_id" id="google_place_id" value={formData.google_place_id || ''} onChange={handleChange} style={inputStyle} />
       </div>
       <div style={fieldStyle}>
-        <label htmlFor="owner_user_id">Owner User ID (Optional):</label>
-        <input type="text" name="owner_user_id" id="owner_user_id" value={formData.owner_user_id || ''} onChange={handleChange} style={inputStyle} />
+        <label htmlFor="owner_user_id">Owner User ID (Optional - Admins only):</label>
+        <input
+            type="text"
+            name="owner_user_id"
+            id="owner_user_id"
+            value={formData.owner_user_id || ''}
+            onChange={handleChange}
+            style={inputStyle}
+            disabled={isShopOwnerCreate || (isEditMode && mutationType?.startsWith('shopOwner'))} // Disable for shop owners
+            hidden={isShopOwnerCreate || (isEditMode && mutationType?.startsWith('shopOwner'))} // Hide for shop owners
+        />
       </div>
+      { (isShopOwnerCreate || (isEditMode && mutationType?.startsWith('shopOwner'))) &&
+        <p style={{fontSize: '0.8em', color: 'var(--text-color-muted)'}}>Owner will be automatically assigned to you.</p>
+      }
 
 
       <button type="submit" disabled={loading} className="button-style primary" style={{marginTop: '1rem', padding: '0.75rem'}}>
