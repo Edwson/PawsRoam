@@ -416,5 +416,74 @@ describe('GraphQL Resolvers', () => {
         expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only role check
       });
     });
+
+    describe('updateUserProfilePicture', () => {
+      const mockUserId = 'user-123';
+      const authenticatedContext = { userId: mockUserId };
+      const newImageUrl = 'http://example.com/new-avatar.jpg';
+      const mockDbUser = {
+        id: mockUserId,
+        email: 'test@example.com',
+        name: 'Test User',
+        role: 'user',
+        status: 'active',
+        created_at: new Date('2023-01-01T00:00:00.000Z'),
+        updated_at: new Date('2023-01-01T00:00:00.000Z'), // Original updated_at
+        // password_hash is not returned by resolver directly
+      };
+
+      it('should update user avatar_url and return updated user', async () => {
+        // Mock the SELECT query to fetch user details
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockDbUser] });
+        // The actual UPDATE query is conceptual, so no mock for it, but we check the console log.
+        const consoleSpy = jest.spyOn(console, 'log');
+
+        const result = await resolvers.Mutation!.updateUserProfilePicture!(
+          null,
+          { imageUrl: newImageUrl },
+          authenticatedContext,
+          {} as any
+        );
+
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = $1', [mockUserId]);
+        expect(consoleSpy).toHaveBeenCalledWith(`Conceptually updated avatar_url for user ${mockUserId} to ${newImageUrl}`);
+
+        expect(result.id).toBe(mockUserId);
+        expect(result.avatar_url).toBe(newImageUrl);
+        expect(result.email).toBe(mockDbUser.email);
+        expect(new Date(result.updated_at).getTime()).toBeGreaterThan(mockDbUser.updated_at.getTime()); // Check updated_at is newer
+
+        consoleSpy.mockRestore();
+      });
+
+      it('should throw error if user is not authenticated', async () => {
+        await expect(
+          resolvers.Mutation!.updateUserProfilePicture!(null, { imageUrl: newImageUrl }, noAuthContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } }));
+        expect(mockPgPoolQuery).not.toHaveBeenCalled();
+      });
+
+      it('should throw error if user not found in DB (after auth check)', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // User not found by SELECT
+
+        await expect(
+          resolvers.Mutation!.updateUserProfilePicture!(
+            null,
+            { imageUrl: newImageUrl },
+            authenticatedContext, // Assume userId is valid from token
+            {} as any
+          )
+        ).rejects.toThrow(new GraphQLError('User not found.', { extensions: { code: 'NOT_FOUND' } }));
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE id = $1', [mockUserId]);
+      });
+       it('should handle database error during user fetch', async () => {
+        mockPgPoolQuery.mockRejectedValueOnce(new Error('DB SELECT failed'));
+
+        await expect(
+          resolvers.Mutation!.updateUserProfilePicture!(
+            null, { imageUrl: newImageUrl }, authenticatedContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Failed to update profile picture.', { extensions: { code: 'INTERNAL_SERVER_ERROR' }}));
+      });
+    });
   });
 });

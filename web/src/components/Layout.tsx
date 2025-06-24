@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image'; // Import NextImage
 
 // Define some basic styles directly in the component or import from a CSS module
 const headerStyle: React.CSSProperties = {
@@ -99,8 +100,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Link href="/map" style={navLinkStyle}>Map Discovery</Link>
           {user ? (
             <>
-              <Link href="/profile" style={navLinkStyle}>Profile</Link>
-              <button onClick={handleLogout} className="button-style">Logout</button>
+              {user.avatar_url ? (
+                <Link href="/profile" passHref>
+                  <a style={{ ...navLinkStyle, padding: '0.2rem', borderRadius: '50%', display: 'flex', alignItems: 'center' }}>
+                    <Image
+                      src={user.avatar_url}
+                      alt="My Avatar"
+                      width={36} // Adjust size as needed
+                      height={36}
+                      style={{ borderRadius: '50%', objectFit: 'cover' }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }} // Fallback
+                    />
+                  </a>
+                </Link>
+              ) : (
+                <Link href="/profile" style={navLinkStyle}>
+                    {/* Fallback icon or initials if no avatar_url */}
+                    <span style={{border: '1px solid var(--current-border-color)', borderRadius: '50%', width: '36px', height: '36px', display: 'inline-flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem'}}>
+                        {user.name ? user.name.substring(0,1).toUpperCase() : user.email.substring(0,1).toUpperCase()}
+                    </span>
+                </Link>
+              )}
+              {/* <Link href="/profile" style={navLinkStyle}>Profile</Link> */}
+              <button onClick={handleLogout} className="button-style secondary">Logout</button>
               {/* <span style={{ fontStyle: 'italic', color: 'var(--text-color-muted)' }}>Welcome, {user.name || user.email}!</span> */}
             </>
           ) : (

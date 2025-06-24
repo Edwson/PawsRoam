@@ -6,7 +6,10 @@ import { ApolloError, useApolloClient } from '@apollo/client';
 interface User {
   id: string;
   email: string;
-  name?: string;
+  name?: string | null; // Align with GraphQL User type
+  role?: string; // Added role
+  status?: string; // Added status
+  avatar_url?: string | null; // Added avatar_url
 }
 
 interface AuthContextType {
