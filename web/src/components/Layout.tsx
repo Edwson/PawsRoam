@@ -98,6 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <nav style={navStyle}>
           <Link href="/" style={navLinkStyle}>Home</Link>
           <Link href="/map" style={navLinkStyle}>Map Discovery</Link>
+          <Link href="/ai-pet-care" style={navLinkStyle}>Pet Care AI</Link> {/* New Link */}
           {user ? (
             <>
               {user.avatar_url ? (

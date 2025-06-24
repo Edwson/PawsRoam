@@ -1,0 +1,123 @@
+/* web/src/app/ai-pet-care/AIPetCare.module.css */
+
+.pageContainer {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: var(--current-surface);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pageTitle {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.pageSubtitle {
+  text-align: center;
+  color: var(--text-color-muted);
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+.questionForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.questionTextarea {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--current-border-color);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 70px;
+  background-color: var(--input-bg-color);
+  color: var(--input-text-color);
+}
+
+.questionTextarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-light-transparent);
+}
+
+.submitButton {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: var(--primary-dark);
+}
+
+.submitButton:disabled {
+  background-color: var(--disabled-bg-color);
+  color: var(--disabled-text-color);
+  cursor: not-allowed;
+}
+
+.loadingText {
+  text-align: center;
+  color: var(--text-color-muted);
+  font-style: italic;
+  padding: 1rem 0;
+}
+
+.adviceContainer {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: var(--current-background); /* Slightly different from page bg */
+  border: 1px solid var(--current-border-color);
+  border-radius: 8px;
+}
+
+.adviceTitle {
+  color: var(--secondary-color);
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--current-border-color);
+  padding-bottom: 0.5rem;
+}
+
+.adviceText {
+  line-height: 1.7;
+  color: var(--text-color);
+  white-space: pre-wrap; /* Preserve newlines from the AI response */
+}
+
+.adviceText p {
+    margin-bottom: 1em; /* Spacing between paragraphs */
+}
+.adviceText p:last-child {
+    margin-bottom: 0;
+}
+
+.disclaimerSeparator {
+    border: 0;
+    height: 1px;
+    background-color: var(--current-border-color);
+    margin: 1.5rem 0;
+}
+
+.disclaimerText {
+    font-size: 0.85em;
+    color: var(--text-color-muted);
+    font-style: italic;
+}
+
+.disclaimerText strong {
+    color: var(--secondary-dark); /* Make "Disclaimer:" stand out a bit */
+}
