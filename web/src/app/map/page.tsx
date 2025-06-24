@@ -67,14 +67,15 @@ const MapPage = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [searchRadiusKm, setSearchRadiusKm] = useState<number>(10); // Default 10km
 
 
-  const [queryVariables, setQueryVariables] = useState<any>({ // Added <any> for simplicity, define type if preferred
+  const [queryVariables, setQueryVariables] = useState<any>({
     filterByName: '',
     filterByType: '',
     latitude: null,
     longitude: null,
-    radiusKm: 10, // Default search radius in KM when location is used
+    radiusKm: searchRadiusKm,
   });
 
   // State for Review Modal
@@ -90,31 +91,35 @@ const MapPage = () => {
 
   useEffect(() => {
     const handler = setTimeout(() => {
-      // Preserve existing location filters if user is only changing text/type filters
       setQueryVariables(prev => ({
-        ...prev, // Keep existing lat, lng, radiusKm
+        ...prev,
         filterByName: searchTerm,
         filterByType: filterType,
+        // radiusKm is updated by its own effect or when userLocation changes
       }));
     }, 500);
     return () => clearTimeout(handler);
   }, [searchTerm, filterType]);
 
-  // Effect to update queryVariables when userLocation changes
+  // Effect to update queryVariables when userLocation or searchRadiusKm changes
   useEffect(() => {
     if (userLocation) {
       setQueryVariables(prev => ({
-        ...prev, // Keep existing name/type filters
+        ...prev,
         latitude: userLocation.lat,
         longitude: userLocation.lng,
-        radiusKm: prev.radiusKm || 10, // Use existing radius or default to 10km
+        radiusKm: searchRadiusKm, // Use the state for radius
+      }));
+    } else {
+      // If no user location, clear geo-filters but keep name/type
+      setQueryVariables(prev => ({
+        ...prev,
+        latitude: null,
+        longitude: null,
+        radiusKm: null, // Or keep searchRadiusKm if we want non-geo searches to respect a radius (doesn't make sense)
       }));
     }
-    // If userLocation becomes null, we might want to clear geo-filters
-    // else {
-    //   setQueryVariables(prev => ({ ...prev, latitude: null, longitude: null, radiusKm: null }));
-    // }
-  }, [userLocation]);
+  }, [userLocation, searchRadiusKm]);
 
   const handleOpenReviewModal = (venueId: string, venueName: string) => {
     setSelectedVenueForReviews({ id: venueId, name: venueName });
@@ -191,6 +196,24 @@ const MapPage = () => {
         <button onClick={handleUseMyLocation} disabled={isLocating} className="button-style secondary">
           {isLocating ? 'Locating...' : '📍 Use My Location'}
         </button>
+        {userLocation && ( // Only show radius control if location is active
+            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <label htmlFor="radiusSelect" style={{fontSize: '0.9rem', color: 'var(--text-color-muted)'}}>Radius:</label>
+                <select
+                    id="radiusSelect"
+                    value={searchRadiusKm}
+                    onChange={(e) => setSearchRadiusKm(parseFloat(e.target.value))}
+                    style={{ padding: '0.4rem', fontSize: '0.9rem', borderRadius: '4px', border: '1px solid var(--current-border-color)' }}
+                >
+                    <option value="1">1 km</option>
+                    <option value="2">2 km</option>
+                    <option value="5">5 km</option>
+                    <option value="10">10 km</option>
+                    <option value="25">25 km</option>
+                    <option value="50">50 km</option>
+                </select>
+            </div>
+        )}
       </div>
 
       {locationError && <p className="error-message" style={{marginBottom: '1rem'}}>{locationError}</p>}
