@@ -7,10 +7,11 @@ jest.mock('../../utils/gemini', () => ({
   generateTextFromGemini: jest.fn(),
 }));
 
-// Mock pgPool for resolvers that might use it (though testGemini doesn't directly, auth ones do)
+// Mock pgPool for resolvers
+const mockPgPoolQuery = jest.fn();
 jest.mock('../../config/db', () => ({
   pgPool: {
-    query: jest.fn(),
+    query: mockPgPoolQuery,
   },
 }));
 
@@ -21,6 +22,7 @@ describe('GraphQL Resolvers', () => {
   beforeEach(() => {
     // Reset mocks before each test
     mockGenerateTextFromGemini.mockReset();
+    mockPgPoolQuery.mockReset(); // Reset pgPool.query mock
     // Clear environment variables for GEMINI_API_KEY or set them as needed per test
     delete process.env.GEMINI_API_KEY;
   });
@@ -86,6 +88,143 @@ describe('GraphQL Resolvers', () => {
             const result = resolvers.Query._empty(null, {}, {}, {} as any);
             expect(result).toBe("This is a placeholder query.");
         });
+    });
+
+    describe('getVenueById', () => {
+      const mockVenueId = 'venue-uuid-123';
+      const mockDbVenue = {
+        id: mockVenueId,
+        name: 'Test Venue',
+        latitude: '40.7128',
+        longitude: '-74.0060',
+        weight_limit_kg: '10.5',
+        created_at: new Date('2023-01-01T12:00:00.000Z'),
+        updated_at: new Date('2023-01-02T12:00:00.000Z'),
+        // ... other venue fields
+      };
+      const expectedGqlVenue = {
+        ...mockDbVenue,
+        latitude: 40.7128,
+        longitude: -74.0060,
+        weight_limit_kg: 10.5,
+        created_at: '2023-01-01T12:00:00.000Z',
+        updated_at: '2023-01-02T12:00:00.000Z',
+      };
+
+      it('should fetch and return a venue if found', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockDbVenue] });
+
+        const result = await resolvers.Query.getVenueById!(null, { id: mockVenueId }, {}, {} as any);
+
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM venues WHERE id = $1', [mockVenueId]);
+        expect(result).toEqual(expectedGqlVenue);
+      });
+
+      it('should throw GraphQLError if venue not found', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+        try {
+          await resolvers.Query.getVenueById!(null, { id: mockVenueId }, {}, {} as any);
+        } catch (e: any) {
+          expect(e).toBeInstanceOf(GraphQLError);
+          expect(e.message).toBe('Venue not found');
+          expect(e.extensions?.code).toBe('NOT_FOUND');
+        }
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM venues WHERE id = $1', [mockVenueId]);
+        expect.assertions(4);
+      });
+
+      it('should throw GraphQLError if database query fails', async () => {
+        const dbError = new Error('DB query failed');
+        mockPgPoolQuery.mockRejectedValueOnce(dbError);
+
+        try {
+          await resolvers.Query.getVenueById!(null, { id: mockVenueId }, {}, {} as any);
+        } catch (e: any) {
+          expect(e).toBeInstanceOf(GraphQLError);
+          expect(e.message).toBe('Failed to fetch venue.');
+          expect(e.extensions?.code).toBe('INTERNAL_SERVER_ERROR');
+          expect(e.extensions?.originalError).toBe(dbError.message);
+        }
+        expect(mockPgPoolQuery).toHaveBeenCalledWith('SELECT * FROM venues WHERE id = $1', [mockVenueId]);
+        expect.assertions(5);
+      });
+    });
+
+    // TODO: Add tests for Venue.reviews field resolver
+    // This would involve setting up a parent DbVenue object and mocking the query for reviews.
+  });
+
+  describe('Venue Field Resolvers', () => {
+    describe('reviews', () => {
+      const mockParentVenue = {
+        id: 'venue-uuid-456',
+        // Other parent venue fields are not strictly necessary for this field resolver test
+        // as long as `id` is present.
+      };
+      const mockDbReview = {
+        id: 'review-uuid-789',
+        user_id: 'user-uuid-123',
+        venue_id: mockParentVenue.id,
+        rating: 5,
+        comment: 'Great place!',
+        visit_date: new Date('2023-02-15T00:00:00.000Z'),
+        created_at: new Date('2023-02-16T10:00:00.000Z'),
+        updated_at: new Date('2023-02-16T11:00:00.000Z'),
+      };
+      const expectedGqlReview = {
+        ...mockDbReview,
+        visit_date: '2023-02-15',
+        created_at: '2023-02-16T10:00:00.000Z',
+        updated_at: '2023-02-16T11:00:00.000Z',
+      };
+
+      it('should fetch and return reviews for the parent venue', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockDbReview] });
+
+        // Ensure resolvers.Venue is defined and has a reviews method
+        expect(resolvers.Venue).toBeDefined();
+        expect(resolvers.Venue!.reviews).toBeInstanceOf(Function);
+
+        const result = await resolvers.Venue!.reviews(mockParentVenue as any, {}, {}, {} as any);
+
+        expect(mockPgPoolQuery).toHaveBeenCalledWith(
+          'SELECT * FROM reviews WHERE venue_id = $1 ORDER BY created_at DESC',
+          [mockParentVenue.id]
+        );
+        expect(result).toEqual([expectedGqlReview]);
+      });
+
+      it('should return an empty array if no reviews are found', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+        const result = await resolvers.Venue!.reviews(mockParentVenue as any, {}, {}, {} as any);
+
+        expect(result).toEqual([]);
+        expect(mockPgPoolQuery).toHaveBeenCalledWith(
+          'SELECT * FROM reviews WHERE venue_id = $1 ORDER BY created_at DESC',
+          [mockParentVenue.id]
+        );
+      });
+
+      it('should throw GraphQLError if database query for reviews fails', async () => {
+        const dbError = new Error('DB review query failed');
+        mockPgPoolQuery.mockRejectedValueOnce(dbError);
+
+        try {
+          await resolvers.Venue!.reviews(mockParentVenue as any, {}, {}, {} as any);
+        } catch (e: any) {
+          expect(e).toBeInstanceOf(GraphQLError);
+          expect(e.message).toBe('Failed to fetch reviews for venue.');
+          expect(e.extensions?.code).toBe('INTERNAL_SERVER_ERROR');
+          expect(e.extensions?.originalError).toBe(dbError.message);
+        }
+        expect(mockPgPoolQuery).toHaveBeenCalledWith(
+          'SELECT * FROM reviews WHERE venue_id = $1 ORDER BY created_at DESC',
+          [mockParentVenue.id]
+        );
+        expect.assertions(5);
+      });
     });
   });
 

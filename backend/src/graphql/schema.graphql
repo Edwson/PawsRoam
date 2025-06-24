@@ -23,6 +23,7 @@ type Query {
   searchVenues(filterByName: String, filterByType: String): [Venue!] # Query for venues
   myPets: [Pet!] # Query to get pets for the authenticated user
   getPetById(id: ID!): Pet # Query to get a single pet by its ID, for editing
+  getVenueById(id: ID!): Venue # Query to get a single venue by its ID
   getReviewsForVenue(venueId: ID!): [Review!]
   myReviews: [Review!]
 }
@@ -133,6 +134,7 @@ type Venue {
 
   average_rating: Float # From venues table
   review_count: Int   # From venues table
+  reviews: [Review!] # Associated reviews for the venue
 
   created_at: String # Typically represented as ISO8601 String
   updated_at: String # Typically represented as ISO8601 String
