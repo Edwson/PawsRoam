@@ -1,12 +1,12 @@
 'use client'; // This is a client component
 
-import React, { useEffect, useRef } from 'react'; // Added useEffect, useRef
+import React, { useEffect } from 'react'; // Added useEffect, Removed useRef
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'; // Added useMap
-import L, { LatLngExpression } from 'leaflet'; // Import L and LatLngExpression
+import L /* , { LatLngExpression } */ from 'leaflet'; // Import L, Removed LatLngExpression
 import Link from 'next/link'; // Import Link for navigation
 import Image from 'next/image'; // Import Image for thumbnails
 
-const defaultVenueImage = "/default-venue-image.png"; // Define default image
+// const defaultVenueImage = "/default-venue-image.png"; // Unused variable
 
 // Fix for default icon issue with Webpack/Next.js
 // (delete L.Icon.Default.prototype._getIconUrl; has been removed in recent Leaflet versions, direct path setting is better)

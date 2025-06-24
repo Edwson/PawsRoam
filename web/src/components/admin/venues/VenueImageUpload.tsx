@@ -102,12 +102,12 @@ const VenueImageUpload: React.FC<VenueImageUploadProps> = ({
     setSuccessMessage(null);
 
     // Simulation of Upload
-    const placeholderUrls = [
-      'https://picsum.photos/seed/venueA/400/300',
-      'https://picsum.photos/seed/venueB/400/300',
-      '/placeholder-venue-images/venue1.jpg', // Assuming you add some to /public
-      '/placeholder-venue-images/venue2.jpg',
-    ];
+    // const placeholderUrls = [ // Unused variable
+    //   'https://picsum.photos/seed/venueA/400/300',
+    //   'https://picsum.photos/seed/venueB/400/300',
+    //   '/placeholder-venue-images/venue1.jpg', // Assuming you add some to /public
+    //   '/placeholder-venue-images/venue2.jpg',
+    // ];
     // const simulatedImageUrl = placeholderUrls[Math.floor(Math.random() * placeholderUrls.length)];
      // For stability in testing, using a more predictable placeholder:
     const simulatedImageUrl = `https://picsum.photos/seed/${venueId}/${Date.now()}/400/300`; // Add timestamp for variety

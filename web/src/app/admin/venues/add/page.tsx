@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard'; // Will be correct if layout handles it
+// import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard'; // Unused import
 import Layout from '@/components/Layout';
 import AppProviders from '@/components/AppProviders';
 import VenueForm from '@/components/admin/venues/VenueForm'; // Create this form component

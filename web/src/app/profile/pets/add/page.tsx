@@ -24,7 +24,7 @@ const AddPetPage = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [createPet, { loading, error: mutationError }] = useMutation(CREATE_PET_MUTATION, {
-    onCompleted: (data) => {
+    onCompleted: (/* data */) => { // data was unused
       // console.log('Pet created:', data.createPet);
       // Optionally, show a success message before redirecting
       // For now, directly redirect to the pets list

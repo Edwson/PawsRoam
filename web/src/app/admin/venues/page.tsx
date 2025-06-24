@@ -4,8 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { gql, useQuery, useMutation } from '@apollo/client';
-// AdminRouteGuard is handled by admin/layout.tsx, so direct import here might not be needed if page is child of layout.
-// import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard';
+// import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard'; // Removed: File does not exist and layout.tsx handles admin protection
 import Layout from '@/components/Layout'; // Standard layout
 import AppProviders from '@/components/AppProviders'; // For Apollo Client
 import Image from 'next/image'; // Import Image for thumbnails
@@ -230,15 +229,14 @@ const AdminVenuesPageContent: React.FC = () => {
   );
 };
 
-// Wrap with AppProviders and AdminRouteGuard
+// Wrap with AppProviders. AdminRouteGuard is removed as layout.tsx handles protection.
 const AdminVenuesPage = () => {
   return (
     <AppProviders> {/* Ensures Apollo Client is available */}
-      <AdminRouteGuard>
-        <Layout>
-          <AdminVenuesPageContent />
-        </Layout>
-      </AdminRouteGuard>
+      {/* AdminRouteGuard was removed as admin/layout.tsx handles protection */}
+      <Layout>
+        <AdminVenuesPageContent />
+      </Layout>
     </AppProviders>
   );
 };

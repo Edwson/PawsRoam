@@ -132,7 +132,7 @@ const AddReviewForm: React.FC<AddReviewFormProps> = ({ venueId, onReviewAdded })
 
     try {
       await addReview({ variables: { input } });
-    } catch (e) {
+    } catch { // e was unused
       // Error is handled by onError callback of useMutation
     }
   };

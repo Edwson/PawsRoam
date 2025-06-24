@@ -15,7 +15,7 @@ import AppProviders from '@/components/AppProviders'; // For Apollo Client conte
 import Layout from '@/components/Layout'; // Standard page layout
 import Image from 'next/image'; // Import Image component
 
-const defaultVenueImage = "/default-venue-image.png"; // Define default image
+// const defaultVenueImage = "/default-venue-image.png"; // Unused variable
 
 
 // Define GraphQL query for fetching a single venue by ID

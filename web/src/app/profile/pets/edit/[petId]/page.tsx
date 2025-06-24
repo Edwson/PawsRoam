@@ -7,8 +7,9 @@ import PetForm, { PetFormData } from '@/components/forms/PetForm';
 import Link from 'next/link';
 import adminStyles from '@/app/admin/AdminLayout.module.css'; // Re-use for page title styling
 import PetAvatarUpload from '@/components/pets/PetAvatarUpload'; // Import the component
-import Image from 'next/image'; // For displaying current avatar
+// import Image from 'next/image'; // Unused import
 import { useAuth } from '@/contexts/AuthContext';
+import { Pet } from '@/lib/types'; // Import Pet type
 
 // GraphQL query to fetch a single pet by ID
 const GET_PET_BY_ID_QUERY = gql`
@@ -44,10 +45,10 @@ const EditPetPage = () => {
 
   const [formError, setFormError] = useState<string | null>(null);
   // Store the full pet data, including avatar_url, not just PetFormData
-  const [currentPet, setCurrentPet] = useState<any | null>(null); // Using 'any' for now, refine with Pet type
+  const [currentPet, setCurrentPet] = useState<Pet | null>(null); // Used Pet type
 
   // Fetch the pet's data
-  const { data: petData, loading: queryLoading, error: queryError, client } = useQuery(GET_PET_BY_ID_QUERY, {
+  const { /* data: petData, */ loading: queryLoading, error: queryError, client } = useQuery<{getPetById: Pet}>(GET_PET_BY_ID_QUERY, { // petData was unused, added Pet type to useQuery
     variables: { id: petId },
     skip: !petId || !currentUser, // Skip if no petId or user not loaded
     onCompleted: (data) => {
@@ -102,12 +103,12 @@ const EditPetPage = () => {
       // Also update the MyPets query cache if avatar is shown there
       // This is more complex as it involves modifying a list.
       // For now, we rely on refetchQueries for MyPets list or a full refetch if needed.
-       const cache = client.cache as ApolloCache<any>;
-       const myPetsQuery = gql`query MyPets { myPets { id name species breed birthdate avatar_url notes created_at updated_at } }`; // Define MyPets query structure
+       const cache = client.cache as ApolloCache<object>; // TODO: Refine type - Used object instead of any
+       const myPetsQuery = gql`query MyPets { myPets { id name species breed birthdate avatar_url notes user_id created_at updated_at } }`; // Added user_id to match Pet type
         try {
-            const dataInCache = cache.readQuery<{ myPets: any[] }>({ query: myPetsQuery });
+            const dataInCache = cache.readQuery<{ myPets: Pet[] }>({ query: myPetsQuery }); // Used Pet[]
             if (dataInCache && dataInCache.myPets) {
-                const updatedMyPets = dataInCache.myPets.map(pet =>
+                const updatedMyPets: Pet[] = dataInCache.myPets.map(pet =>
                     pet.id === petId ? { ...pet, avatar_url: newAvatarUrl } : pet
                 );
                 cache.writeQuery({ query: myPetsQuery, data: { myPets: updatedMyPets } });
@@ -123,7 +124,7 @@ const EditPetPage = () => {
     setFormError(null);
     if (!petId) return;
 
-    const inputForMutation: Partial<PetFormData> = {};
+    // const inputForMutation: Partial<PetFormData> = {}; // Unused variable
     // Only include fields that have changed or are part of the UpdatePetInput
     // For simplicity, sending all fields, GQL resolver will pick what it needs.
     // A more optimized approach would be to send only changed fields.

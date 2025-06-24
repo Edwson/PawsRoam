@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react'; // Removed useState
 import { gql, useLazyQuery } from '@apollo/client';
 import ReviewList, { Review } from '../reviews/ReviewList'; // Assuming Review interface is exported
 // import AddReviewForm from '../forms/AddReviewForm'; // Will be created next
@@ -72,8 +72,8 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ venueId, venueName, isOpen, o
 
   const [
     fetchReviews,
-    { loading: reviewsLoading, error: reviewsError, data: reviewsData, refetch: refetchReviews }
-  ] = useLazyQuery(GET_REVIEWS_FOR_VENUE_QUERY);
+    { loading: reviewsLoading, error: reviewsError, data: reviewsData, /* refetch: refetchReviews */ }
+  ] = useLazyQuery(GET_REVIEWS_FOR_VENUE_QUERY); // refetchReviews was unused
 
   useEffect(() => {
     if (isOpen && venueId) {

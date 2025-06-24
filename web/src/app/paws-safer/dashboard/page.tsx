@@ -7,7 +7,7 @@ import Image from 'next/image'; // For pet images in alerts
 import Link from 'next/link'; // Import Link
 // PawsSaferLayout will handle AppProviders, Layout, and auth guard
 
-const defaultPetImage = "/default-pet-avatar.png"; // Fallback for pet images in alerts
+// const defaultPetImage = "/default-pet-avatar.png"; // Unused variable
 
 // GraphQL query to fetch active pet alerts
 const GET_ACTIVE_PET_ALERTS_QUERY = gql`
@@ -95,15 +95,15 @@ const textStyle: React.CSSProperties = {
   marginBottom: '1rem',
 };
 
-const featureListStyle: React.CSSProperties = {
-  listStyle: 'disc', // Use disc for a more standard list look
-  paddingLeft: '20px', // Indent list items
-};
+// const featureListStyle: React.CSSProperties = { // Unused variable
+//   listStyle: 'disc', // Use disc for a more standard list look
+//   paddingLeft: '20px', // Indent list items
+// };
 
-const featureListItemStyle: React.CSSProperties = {
-  padding: '0.3rem 0',
-  color: 'var(--text-color-slightly-muted)', // Slightly muted for list items
-};
+// const featureListItemStyle: React.CSSProperties = { // Unused variable
+//   padding: '0.3rem 0',
+//   color: 'var(--text-color-slightly-muted)', // Slightly muted for list items
+// };
 
 const alertCardStyle: React.CSSProperties = {
   backgroundColor: 'var(--current-surface-accent)', // Slightly different background for cards

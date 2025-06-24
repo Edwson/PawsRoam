@@ -18,7 +18,7 @@ const AIPetCarePageContent: React.FC = () => {
   const [question, setQuestion] = useState('');
   const [advice, setAdvice] = useState<string | null>(null);
 
-  const [getAdvice, { loading, error, data }] = useLazyQuery(GET_PET_CARE_ADVICE_QUERY, {
+  const [getAdvice, { loading, error, /* data */ }] = useLazyQuery(GET_PET_CARE_ADVICE_QUERY, { // data was unused
     onCompleted: (queryData) => {
       setAdvice(queryData.getPetCareAdvice);
     },

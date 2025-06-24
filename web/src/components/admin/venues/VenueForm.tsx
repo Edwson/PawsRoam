@@ -1,10 +1,10 @@
 // web/src/components/admin/venues/VenueForm.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'; // Removed useEffect
 import { useRouter } from 'next/navigation';
 import { gql, useMutation, useQuery } from '@apollo/client';
-import { AdminCreateVenueInput, AdminUpdateVenueInput, Venue as VenueType } from '@/lib/types';
+import { AdminCreateVenueInput, AdminUpdateVenueInput, Venue as VenueType, ShopOwnerCreateVenueInput, ShopOwnerUpdateVenueInput } from '@/lib/types';
 
 const ADMIN_CREATE_VENUE_MUTATION = gql`
   mutation AdminCreateVenue($input: AdminCreateVenueInput!) {
@@ -135,7 +135,7 @@ const VenueForm: React.FC<VenueFormProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   // Fetch venue data if in edit mode
-  const { data: venueData, loading: queryLoading, error: queryError } = useQuery<{ getVenueById: VenueType }>(
+  const { /* data: venueData, */ loading: queryLoading, error: queryError } = useQuery<{ getVenueById: VenueType }>( // venueData was unused
     GET_VENUE_BY_ID_QUERY,
     {
       variables: { id: venueId },
@@ -144,7 +144,7 @@ const VenueForm: React.FC<VenueFormProps> = ({
         if (data && data.getVenueById) {
           // Prepare data for form: nulls to empty strings, numbers for number inputs
           const fetchedVenue = data.getVenueById;
-          const preparedFormData: any = {};
+          const preparedFormData: Partial<AdminCreateVenueInput> = {};
           Object.keys(initialFormData).forEach(key => {
             const formKey = key as keyof AdminCreateVenueInput; // Use AdminCreateVenueInput here
             const fetchedValue = fetchedVenue[formKey as keyof VenueType]; // Access fetchedVenue with a key of VenueType
@@ -164,9 +164,9 @@ const VenueForm: React.FC<VenueFormProps> = ({
             }
           });
            // Ensure lat/lng are numbers (fetchedVenue values might be strings if not parsed by Apollo)
-          preparedFormData.latitude = parseFloat(fetchedVenue.latitude as any) || 0;
-          preparedFormData.longitude = parseFloat(fetchedVenue.longitude as any) || 0;
-          preparedFormData.weight_limit_kg = fetchedVenue.weight_limit_kg ? parseFloat(fetchedVenue.weight_limit_kg as any) : null;
+          preparedFormData.latitude = parseFloat(fetchedVenue.latitude as unknown as string) || 0;
+          preparedFormData.longitude = parseFloat(fetchedVenue.longitude as unknown as string) || 0;
+          preparedFormData.weight_limit_kg = fetchedVenue.weight_limit_kg ? parseFloat(fetchedVenue.weight_limit_kg as unknown as string) : null;
 
 
           setFormData(preparedFormData as AdminCreateVenueInput); // Set as AdminCreateVenueInput
@@ -224,7 +224,7 @@ const VenueForm: React.FC<VenueFormProps> = ({
     } else if (name === 'opening_hours') {
         try {
             processedValue = value.trim() === '' ? null : JSON.parse(value);
-        } catch (jsonError) {
+        } catch /* (jsonError) */ { // jsonError was unused
             console.warn("Invalid JSON for opening hours:", value);
             // Keep as string for now, or set specific error for this field
             // For simplicity, we'll let backend validate JSON or use a more robust JSON editor component
@@ -246,51 +246,48 @@ const VenueForm: React.FC<VenueFormProps> = ({
     }
 
     // Prepare data for mutation (e.g. ensure numbers are numbers)
-    const submissionData: any = { ...formData };
-    submissionData.latitude = parseFloat(String(formData.latitude));
-    submissionData.longitude = parseFloat(String(formData.longitude));
+    // Start with a Partial type, then cast to specific input types before mutation.
+    const processedSubmissionData: Partial<AdminCreateVenueInput> = { ...formData };
+    processedSubmissionData.latitude = parseFloat(String(formData.latitude));
+    processedSubmissionData.longitude = parseFloat(String(formData.longitude));
     if (formData.weight_limit_kg !== null && formData.weight_limit_kg !== undefined) {
-        submissionData.weight_limit_kg = parseFloat(String(formData.weight_limit_kg));
+        processedSubmissionData.weight_limit_kg = parseFloat(String(formData.weight_limit_kg));
     } else {
-        submissionData.weight_limit_kg = null;
+        processedSubmissionData.weight_limit_kg = null;
     }
      // Handle empty strings for optional fields by converting them to null
-    Object.keys(submissionData).forEach(key => {
-        if (submissionData[key] === '') {
-            const initialField = initialFormData[key as keyof AdminCreateVenueInput];
+    Object.keys(processedSubmissionData).forEach(keyStr => {
+        const key = keyStr as keyof AdminCreateVenueInput;
+        if (processedSubmissionData[key] === '') {
+            const initialField = initialFormData[key];
             // Only set to null if it's not a boolean and not a required number like lat/lng
             if (typeof initialField !== 'boolean' && key !== 'latitude' && key !== 'longitude') {
-                 submissionData[key] = null;
+                 processedSubmissionData[key] = null;
             }
         }
     });
 
 
     if (isEditMode) {
-      // Prepare payload for AdminUpdateVenueInput. It should only contain fields present in AdminUpdateVenueInput.
-      // And changed fields ideally, but for simplicity, we send all form fields that are part of the input type.
-      const updatePayload: AdminUpdateVenueInput = { ...submissionData };
-      // Remove any fields not part of AdminUpdateVenueInput explicitly if necessary,
-      // though GraphQL should ignore extra fields if not strictly typed on resolver.
-      // Example: if 'id' or 'created_at' were part of submissionData erroneously.
-      // delete (updatePayload as any).id;
-      // delete (updatePayload as any).created_at;
-      // ...etc. for fields not in AdminUpdateVenueInput
+      const updatePayload = processedSubmissionData as AdminUpdateVenueInput; // All fields are optional for update
 
       if (mutationType === 'shopOwnerUpdateVenueDetails') {
-        // Ensure owner_user_id and status are not sent by shop owner for update
-        const { owner_user_id, status, ...shopOwnerUpdatePayload } = updatePayload;
-        shopOwnerUpdateVenueDetails({ variables: { venueId: venueId!, input: shopOwnerUpdatePayload } });
+        // For ShopOwnerUpdateVenueInput, owner_user_id and status should not be updatable by shop owner.
+        const { owner_user_id, status, google_place_id, ...shopOwnerAllowedUpdatesRest } = updatePayload;
+        const shopOwnerUpdatesPayload: ShopOwnerUpdateVenueInput = shopOwnerAllowedUpdatesRest;
+        shopOwnerUpdateVenueDetails({ variables: { venueId: venueId!, input: shopOwnerUpdatesPayload } });
       } else { // Default to adminUpdateVenue for edits
         adminUpdateVenue({ variables: { id: venueId!, input: updatePayload } });
       }
     } else { // Create mode
+      const createPayload = processedSubmissionData as AdminCreateVenueInput; // For creation, assume all required fields are now present.
       if (mutationType === 'shopOwnerCreateVenue') {
-        // For shop owner, owner_user_id is set by backend, so remove it from input if present
-        const { owner_user_id, ...shopOwnerSubmissionData } = submissionData;
-        shopOwnerCreateVenue({ variables: { input: shopOwnerSubmissionData as AdminCreateVenueInput } });
+        // For shopOwnerCreateVenue, owner_user_id and status are set by backend or have defaults.
+        const { owner_user_id, status, ...shopOwnerAllowedCreationFieldsRest } = createPayload;
+        const shopOwnerCreationPayload: ShopOwnerCreateVenueInput = shopOwnerAllowedCreationFieldsRest;
+        shopOwnerCreateVenue({ variables: { input: shopOwnerCreationPayload } });
       } else { // Default to adminCreateVenue
-        adminCreateVenue({ variables: { input: submissionData as AdminCreateVenueInput } });
+        adminCreateVenue({ variables: { input: createPayload } });
       }
     }
   };

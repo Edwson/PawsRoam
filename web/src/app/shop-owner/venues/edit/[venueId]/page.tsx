@@ -1,13 +1,14 @@
 // web/src/app/shop-owner/venues/edit/[venueId]/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'; // Removed useEffect
 import { useParams, useRouter } from 'next/navigation';
-import { gql, useQuery, useMutation, ApolloCache, useApolloClient } from '@apollo/client'; // Added useMutation
+import { gql, useQuery, useMutation, useApolloClient } from '@apollo/client'; // Added useMutation, removed ApolloCache
+import Link from 'next/link'; // Import Link
 // ShopOwnerLayout will provide AppProviders and the main Layout wrapper
 import VenueForm from '@/components/admin/venues/VenueForm'; // Reusing the admin form
 import VenueImageUpload from '@/components/admin/venues/VenueImageUpload'; // Reusing the admin image uploader
-import { Venue as VenueType, ShopOwnerUpdateVenueInput } from '@/lib/types'; // Import types
+import { Venue as VenueType /* ShopOwnerUpdateVenueInput */ } from '@/lib/types'; // Commented out ShopOwnerUpdateVenueInput
 import { useAuth } from '@/contexts/AuthContext';
 
 // Query to fetch venue data for editing by owner
@@ -69,7 +70,7 @@ const EditVenueByShopOwnerPageContent: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
 
-  const { loading, error: queryError, data, refetch: refetchVenueData } = useQuery<{ getVenueById: VenueType }>(
+  const { loading, error: queryError, /* data, */ refetch: refetchVenueData } = useQuery<{ getVenueById: VenueType }>( // data was unused
     GET_VENUE_BY_ID_FOR_OWNER_EDIT,
     {
       variables: { id: venueId },
