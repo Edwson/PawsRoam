@@ -27,6 +27,7 @@ type Query {
   getReviewsForVenue(venueId: ID!): [Review!]
   myReviews: [Review!]
   getPetCareAdvice(question: String!): String! # AI Pet Care Q&A
+  myOwnedVenues: [Venue!] # For shop owners to see their venues
 }
 
 type Mutation {
@@ -57,6 +58,9 @@ type Mutation {
 
   # Admin User Management
   adminUpdateUser(userId: ID!, input: AdminUpdateUserInput!): User
+
+  # Shop Owner mutations
+  shopOwnerCreateVenue(input: AdminCreateVenueInput!): Venue! # Reusing AdminCreateVenueInput
 }
 
 input AdminUpdateUserInput {

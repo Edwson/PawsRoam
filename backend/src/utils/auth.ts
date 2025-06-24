@@ -88,3 +88,40 @@ export const ensureAdmin = async (context: ResolverContext): Promise<void> => {
     });
   }
 };
+
+// Helper function to ensure the user is a shop owner (or admin)
+export const ensureShopOwnerOrAdmin = async (context: ResolverContext): Promise<{userId: string, role: string}> => {
+  if (!context.userId) {
+    throw new GraphQLError('User is not authenticated', {
+      extensions: { code: 'UNAUTHENTICATED' },
+    });
+  }
+
+  if (!pgPool) {
+    throw new GraphQLError('Database not configured', {
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+  }
+
+  try {
+    const userResult = await pgPool.query('SELECT role FROM users WHERE id = $1', [context.userId]);
+    if (userResult.rows.length === 0) {
+      throw new GraphQLError('User not found', {
+        extensions: { code: 'INTERNAL_SERVER_ERROR' }, // Or NOT_FOUND
+      });
+    }
+    const userRole = userResult.rows[0].role;
+    if (userRole !== 'business_owner' && userRole !== 'admin') {
+      throw new GraphQLError('User is not authorized for this shop owner action', {
+        extensions: { code: 'FORBIDDEN' },
+      });
+    }
+    return { userId: context.userId, role: userRole }; // Return userId and role for convenience
+  } catch (error: any) {
+    if (error instanceof GraphQLError) throw error;
+    console.error("Error checking shop owner/admin status:", error);
+    throw new GraphQLError('Error verifying user authorization for shop owner action', {
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+  }
+};

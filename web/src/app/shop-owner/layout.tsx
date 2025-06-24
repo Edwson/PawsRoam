@@ -93,8 +93,9 @@ const ShopOwnerLayoutContent = ({ children }: { children: ReactNode }) => {
           <Link href="/shop-owner/dashboard" style={navLinkStyle} /* activeStyle={pathname === '/shop-owner/dashboard' ? activeNavLinkStyle : {}} */ >
             Dashboard
           </Link>
-          {/* Add more links as features are built, e.g.: */}
-          {/* <Link href="/shop-owner/venues" style={navLinkStyle}>My Venues</Link> */}
+          <Link href="/shop-owner/venues" style={navLinkStyle}>
+            My Venues
+          </Link>
           {/* <Link href="/shop-owner/profile" style={navLinkStyle}>Business Profile</Link> */}
           <p style={{fontSize: '0.85em', color: 'var(--text-color-muted)', marginTop: '1rem'}}>(More features coming soon!)</p>
         </nav>

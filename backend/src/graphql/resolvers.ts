@@ -1,4 +1,4 @@
-import { generateToken, hashPassword, comparePassword, ensureAdmin } from '../utils/auth';
+import { generateToken, hashPassword, comparePassword, ensureAdmin, ensureShopOwnerOrAdmin } from '../utils/auth';
 import { generateTextFromGemini } from '../utils/gemini';
 import { GraphQLError } from 'graphql';
 import { pgPool } from '../config/db'; // Import the pgPool
@@ -159,6 +159,37 @@ export const resolvers: Resolvers = {
       } catch (dbError: any) {
         console.error("Error fetching pets:", dbError);
         throw new GraphQLError('Failed to fetch pets.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+    myOwnedVenues: async (_parent: any, _args: any, context: ResolverContext) => {
+      const { userId, role } = await ensureShopOwnerOrAdmin(context); // Ensures user is shop_owner or admin
+      // If role needs to be strictly 'business_owner' for this query:
+      // if (role !== 'business_owner') {
+      //   throw new GraphQLError('Only shop owners can view their owned venues.', { extensions: { code: 'FORBIDDEN' }});
+      // }
+
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        const result = await pgPool.query<DbVenue>(
+          'SELECT * FROM venues WHERE owner_user_id = $1 ORDER BY name ASC',
+          [userId]
+        );
+        return result.rows.map(venue => ({
+          ...venue,
+          latitude: parseFloat(venue.latitude as any),
+          longitude: parseFloat(venue.longitude as any),
+          weight_limit_kg: venue.weight_limit_kg ? parseFloat(venue.weight_limit_kg as any) : null,
+          created_at: venue.created_at.toISOString(),
+          updated_at: venue.updated_at.toISOString(),
+          // image_url will be part of ...venue if it exists in DbVenue and is selected
+        }));
+      } catch (dbError: any) {
+        console.error("Error fetching owned venues:", dbError);
+        throw new GraphQLError('Failed to fetch owned venues.', {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
@@ -453,6 +484,48 @@ export const resolvers: Resolvers = {
             });
         }
         throw new GraphQLError('Failed to update user.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    shopOwnerCreateVenue: async (_parent: any, { input }: { input: any /* AdminCreateVenueInput */ }, context: ResolverContext) => {
+      const { userId } = await ensureShopOwnerOrAdmin(context); // Ensures user is shop_owner or admin
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      // Destructure all fields from input, which matches AdminCreateVenueInput
+      const { name, address, city, state_province, postal_code, country, latitude, longitude, phone_number, website, description, opening_hours, type, pet_policy_summary, pet_policy_details, allows_off_leash, has_indoor_seating_for_pets, has_outdoor_seating_for_pets, water_bowls_provided, pet_treats_available, pet_menu_available, dedicated_pet_area, weight_limit_kg, carrier_required, additional_pet_services, status, google_place_id } = input;
+
+      // owner_user_id is overridden with the authenticated shop owner's ID
+      const ownerUserIdForDb = userId;
+
+      // Default status if not provided by shop owner, or use what they send if allowed by input type
+      const venueStatus = status || 'pending_approval'; // Default to pending approval for shop owner submissions
+
+      const query = `
+        INSERT INTO venues (owner_user_id, name, address, city, state_province, postal_code, country, latitude, longitude, phone_number, website, description, opening_hours, type, pet_policy_summary, pet_policy_details, allows_off_leash, has_indoor_seating_for_pets, has_outdoor_seating_for_pets, water_bowls_provided, pet_treats_available, pet_menu_available, dedicated_pet_area, weight_limit_kg, carrier_required, additional_pet_services, status, google_place_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        RETURNING *;
+      `;
+      const values = [ownerUserIdForDb, name, address, city, state_province, postal_code, country, latitude, longitude, phone_number, website, description, opening_hours, type, pet_policy_summary, pet_policy_details, allows_off_leash, has_indoor_seating_for_pets, has_outdoor_seating_for_pets, water_bowls_provided, pet_treats_available, pet_menu_available, dedicated_pet_area, weight_limit_kg, carrier_required, additional_pet_services, venueStatus, google_place_id];
+
+      try {
+        const result = await pgPool.query<DbVenue>(query, values);
+        const newVenue = result.rows[0];
+        // Map to GraphQL Venue type
+        return {
+          ...newVenue,
+          latitude: parseFloat(newVenue.latitude as any),
+          longitude: parseFloat(newVenue.longitude as any),
+          weight_limit_kg: newVenue.weight_limit_kg ? parseFloat(newVenue.weight_limit_kg as any) : null,
+          created_at: newVenue.created_at.toISOString(),
+          updated_at: newVenue.updated_at.toISOString(),
+          // image_url: newVenue.image_url, // if image_url is part of DbVenue and selected
+        };
+      } catch (dbError: any) {
+        console.error("Error in shopOwnerCreateVenue:", dbError);
+        // Handle specific errors like unique constraint violations if necessary
+        throw new GraphQLError('Failed to create venue as shop owner.', {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
