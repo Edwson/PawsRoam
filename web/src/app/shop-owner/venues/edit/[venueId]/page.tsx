@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const GET_VENUE_BY_ID_FOR_OWNER_EDIT = gql`
   query GetVenueByIdForOwnerEdit($id: ID!) {
     # We can use getVenueById, ownership check will be primarily in mutation resolvers
-    # Or, if we had a specific query like `getMyOwnedVenueById(id: ID!)` that would be better.
+    # Or, if we had a specific query like getMyOwnedVenueById(id: ID!) that would be better.
     # For now, using generic getVenueById and relying on UI/mutation checks.
     getVenueById(id: $id) {
       id

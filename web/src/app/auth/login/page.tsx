@@ -5,7 +5,7 @@ import { gql, useMutation } from '@apollo/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link'; // Import Link
-import styles from './AuthForm.module.css'; // Import CSS module
+import styles from '../AuthForm.module.css'; // Corrected Import CSS module
 
 const LOGIN_USER = gql`
   mutation LoginUser($email: String!, $password: String!) {
