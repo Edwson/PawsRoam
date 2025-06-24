@@ -144,7 +144,7 @@ const MyAlertsPageContent: React.FC = () => {
   const alerts = data?.getMyCreatedAlerts || [];
 
   return ( // Added explicit parentheses
-    <div style={pageContainerStyle}>
+    (<div style={pageContainerStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1 style={{color: 'var(--primary-color)'}}>My Reported Alerts</h1>
         <Link href="/alerts/create" className="button-style primary">
@@ -205,8 +205,8 @@ const MyAlertsPageContent: React.FC = () => {
           </div>
         ))
       )}
-    </div>
-  ); // Added explicit parentheses
+    </div>) // Added explicit parentheses
+  );
 };
 
 const MyAlertsPage = () => {
