@@ -143,7 +143,7 @@ const MyAlertsPageContent: React.FC = () => {
 
   const alerts = data?.getMyCreatedAlerts || [];
 
-  return (
+  return ( // Added explicit parentheses
     <div style={pageContainerStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1 style={{color: 'var(--primary-color)'}}>My Reported Alerts</h1>
@@ -206,7 +206,7 @@ const MyAlertsPageContent: React.FC = () => {
         ))
       )}
     </div>
-  );
+  ); // Added explicit parentheses
 };
 
 const MyAlertsPage = () => {
