@@ -88,10 +88,9 @@ const PawsSaferLayoutContent = ({ children }: { children: ReactNode }) => {
         </h3>
         <nav>
           <Link href="/paws-safer/dashboard" style={navLinkStyle} /* className={pathname === '/paws-safer/dashboard' ? styles.activeLink : styles.navLink} */>
-            🛡️ Dashboard
+            🛡️ Active Alerts
           </Link>
           {/* Placeholder for future PawsSafer links */}
-          {/* <Link href="/paws-safer/alerts" style={navLinkStyle}>Active Alerts</Link> */}
           {/* <Link href="/paws-safer/resources" style={navLinkStyle}>Emergency Resources</Link> */}
           <p style={{fontSize: '0.85em', color: 'var(--accent-dark)', marginTop: '1rem', opacity: 0.8}}>(Alerts & Resources coming soon)</p>
         </nav>

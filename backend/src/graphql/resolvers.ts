@@ -86,6 +86,27 @@ interface DbVenueClaim {
     updated_at: Date;
 }
 
+interface DbPetAlert {
+    id: string; // UUID
+    created_by_user_id: string; // UUID
+    alert_type: string;
+    description: string;
+    status: string;
+    latitude: number; // Comes as string from pg, will be parsed
+    longitude: number; // Comes as string from pg, will be parsed
+    location_accuracy?: number | null;
+    pet_name?: string | null;
+    pet_species?: string | null;
+    pet_breed?: string | null;
+    pet_image_url?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    last_seen_at?: Date | null;
+    resolved_at?: Date | null;
+    created_at: Date;
+    updated_at: Date;
+}
+
 // Define context type for resolvers
 interface ResolverContext {
   userId?: string | null; // userId will be injected from Apollo Server context
@@ -145,6 +166,9 @@ interface Resolvers {
     user: (parent: DbVenueClaim, args: any, context: ResolverContext, info: any) => any;
     venue: (parent: DbVenueClaim, args: any, context: ResolverContext, info: any) => any;
   };
+  PetAlert?: { // Field resolvers for PetAlert type
+    createdByUser: (parent: DbPetAlert, args: any, context: ResolverContext, info: any) => any;
+  };
 }
 
 export const resolvers: Resolvers = {
@@ -174,6 +198,65 @@ export const resolvers: Resolvers = {
       } catch (dbError: any) {
         console.error("Error fetching pets:", dbError);
         throw new GraphQLError('Failed to fetch pets.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+    getActivePetAlerts: async (_parent: any, { latitude, longitude, radiusKm }: { latitude?: number, longitude?: number, radiusKm?: number }, context: ResolverContext) => {
+      // For V1, geospatial filtering is not implemented. We'll just return active alerts.
+      // Ensure user is authenticated, as this might be sensitive info or for specific roles in future.
+      if (!context.userId) { // Or check for specific roles like 'paws_safer', 'admin'
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        // TODO: Implement geospatial filtering when backend supports it.
+        // For now, ignoring latitude, longitude, radiusKm and fetching all active.
+        const result = await pgPool.query<DbPetAlert>(
+          "SELECT * FROM pet_alerts WHERE status = 'active' ORDER BY created_at DESC"
+        );
+        return result.rows.map(alert => ({
+          ...alert,
+          latitude: parseFloat(alert.latitude as any),
+          longitude: parseFloat(alert.longitude as any),
+          last_seen_at: alert.last_seen_at ? alert.last_seen_at.toISOString() : null,
+          resolved_at: alert.resolved_at ? alert.resolved_at.toISOString() : null,
+          created_at: alert.created_at.toISOString(),
+          updated_at: alert.updated_at.toISOString(),
+        }));
+      } catch (dbError: any) {
+        console.error("Error fetching active pet alerts:", dbError);
+        throw new GraphQLError('Failed to fetch active pet alerts.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+    getMyCreatedAlerts: async (_parent: any, _args: any, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+      try {
+        const result = await pgPool.query<DbPetAlert>(
+          'SELECT * FROM pet_alerts WHERE created_by_user_id = $1 ORDER BY created_at DESC',
+          [context.userId]
+        );
+        return result.rows.map(alert => ({
+          ...alert,
+          latitude: parseFloat(alert.latitude as any),
+          longitude: parseFloat(alert.longitude as any),
+          last_seen_at: alert.last_seen_at ? alert.last_seen_at.toISOString() : null,
+          resolved_at: alert.resolved_at ? alert.resolved_at.toISOString() : null,
+          created_at: alert.created_at.toISOString(),
+          updated_at: alert.updated_at.toISOString(),
+        }));
+      } catch (dbError: any) {
+        console.error("Error fetching user's created alerts:", dbError);
+        throw new GraphQLError("Failed to fetch your created alerts.", {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
@@ -527,6 +610,152 @@ export const resolvers: Resolvers = {
             });
         }
         throw new GraphQLError('Failed to update user.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    createPetAlert: async (_parent: any, { input }: { input: any /* CreatePetAlertInput */ }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated. Please log in to create an alert.', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      const { alert_type, description, latitude, longitude, location_accuracy, pet_name, pet_species, pet_breed, pet_image_url, contact_phone, contact_email, last_seen_at } = input;
+
+      // Basic validation for required fields (though GraphQL schema should also enforce some)
+      if (!alert_type || !description || latitude === undefined || longitude === undefined) {
+        throw new GraphQLError('Alert type, description, latitude, and longitude are required.', { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+
+      const query = `
+        INSERT INTO pet_alerts
+          (created_by_user_id, alert_type, description, status, latitude, longitude, location_accuracy,
+           pet_name, pet_species, pet_breed, pet_image_url, contact_phone, contact_email, last_seen_at)
+        VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING *;
+      `;
+      const values = [
+        context.userId, alert_type, description, latitude, longitude, location_accuracy,
+        pet_name, pet_species, pet_breed, pet_image_url, contact_phone, contact_email, last_seen_at
+      ];
+
+      try {
+        const result = await pgPool.query<DbPetAlert>(query, values);
+        const newAlert = result.rows[0];
+        return {
+          ...newAlert,
+          latitude: parseFloat(newAlert.latitude as any),
+          longitude: parseFloat(newAlert.longitude as any),
+          last_seen_at: newAlert.last_seen_at ? newAlert.last_seen_at.toISOString() : null,
+          resolved_at: newAlert.resolved_at ? newAlert.resolved_at.toISOString() : null,
+          created_at: newAlert.created_at.toISOString(),
+          updated_at: newAlert.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error in createPetAlert:", dbError);
+        throw new GraphQLError('Failed to create pet alert.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    updatePetAlertStatus: async (_parent: any, { input }: { input: { alertId: string, newStatus: string, notes?: string } }, context: ResolverContext) => {
+      const { userId, role } = await ensureShopOwnerOrAdmin(context); // Using this ensures 'admin' or 'business_owner'
+      // For this mutation, we actually want 'paws_safer' or 'admin'
+      if (role !== 'paws_safer' && role !== 'admin') {
+         throw new GraphQLError('User not authorized to update alert status. Must be a PawsSafer or Admin.', { extensions: { code: 'FORBIDDEN' } });
+      }
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      const { alertId, newStatus, notes } = input; // 'notes' here are for PawsSafer/Admin, not a public field on PetAlert type yet.
+
+      // Validate newStatus against allowed values
+      const allowedStatuses = ['investigating', 'resolved', 'cancelled', 'active']; // 'active' if re-opening?
+      if (!allowedStatuses.includes(newStatus)) {
+        throw new GraphQLError(`Invalid status: ${newStatus}. Must be one of: ${allowedStatuses.join(', ')}.`, { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+
+      let query = 'UPDATE pet_alerts SET status = $1, updated_at = CURRENT_TIMESTAMP';
+      const values: any[] = [newStatus];
+      let valueCount = 2;
+
+      if (newStatus === 'resolved') {
+        query += `, resolved_at = CURRENT_TIMESTAMP`;
+      }
+      // If we add an admin_notes field to pet_alerts table for status changes:
+      // if (notes) {
+      //   query += `, admin_notes = $${valueCount++}`; // Assuming a field for these notes
+      //   values.push(notes);
+      // }
+      query += ` WHERE id = $${valueCount++} RETURNING *;`;
+      values.push(alertId);
+
+      console.log("PawsSafer/Admin notes for status update (not stored on alert yet):", notes);
+
+
+      try {
+        const result = await pgPool.query<DbPetAlert>(query, values);
+        if (result.rows.length === 0) {
+          throw new GraphQLError('Pet alert not found or update failed.', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const updatedAlert = result.rows[0];
+        return {
+          ...updatedAlert,
+          latitude: parseFloat(updatedAlert.latitude as any),
+          longitude: parseFloat(updatedAlert.longitude as any),
+          last_seen_at: updatedAlert.last_seen_at ? updatedAlert.last_seen_at.toISOString() : null,
+          resolved_at: updatedAlert.resolved_at ? updatedAlert.resolved_at.toISOString() : null,
+          created_at: updatedAlert.created_at.toISOString(),
+          updated_at: updatedAlert.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error in updatePetAlertStatus:", dbError);
+        throw new GraphQLError('Failed to update pet alert status.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    cancelPetAlert: async (_parent: any, { alertId }: { alertId: string }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated.', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      try {
+        const alertCheck = await pgPool.query<DbPetAlert>('SELECT created_by_user_id, status FROM pet_alerts WHERE id = $1', [alertId]);
+        if (alertCheck.rows.length === 0) {
+          throw new GraphQLError('Pet alert not found.', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const alert = alertCheck.rows[0];
+        if (alert.created_by_user_id !== context.userId) {
+          throw new GraphQLError('You are not authorized to cancel this alert.', { extensions: { code: 'FORBIDDEN' } });
+        }
+        if (alert.status !== 'active') {
+          throw new GraphQLError(`Cannot cancel alert. Current status is '${alert.status}'. Only active alerts can be cancelled.`, { extensions: { code: 'BAD_REQUEST' } });
+        }
+
+        const result = await pgPool.query<DbPetAlert>(
+          "UPDATE pet_alerts SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
+          [alertId]
+        );
+
+        const cancelledAlert = result.rows[0]; // Should always exist if previous checks passed
+         return {
+          ...cancelledAlert,
+          latitude: parseFloat(cancelledAlert.latitude as any),
+          longitude: parseFloat(cancelledAlert.longitude as any),
+          last_seen_at: cancelledAlert.last_seen_at ? cancelledAlert.last_seen_at.toISOString() : null,
+          resolved_at: cancelledAlert.resolved_at ? cancelledAlert.resolved_at.toISOString() : null,
+          created_at: cancelledAlert.created_at.toISOString(),
+          updated_at: cancelledAlert.updated_at.toISOString(),
+        };
+
+      } catch (dbError: any) {
+        console.error("Error in cancelPetAlert:", dbError);
+         if (dbError instanceof GraphQLError) throw dbError;
+        throw new GraphQLError('Failed to cancel pet alert.', {
           extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
         });
       }
@@ -1518,5 +1747,20 @@ export const resolvers: Resolvers = {
         // image_url: dbVenue.image_url // if it exists on DbVenue and Venue type
       } : null;
     }
+  },
+  PetAlert: {
+    createdByUser: async (parent: DbPetAlert, _args: any, _context: ResolverContext) => {
+      if (!pgPool) throw new GraphQLError('Database not configured');
+      if (!parent.created_by_user_id) return null; // If user was deleted and FK set to NULL
+
+      const result = await pgPool.query<DbUser>('SELECT * FROM users WHERE id = $1', [parent.created_by_user_id]);
+      const dbUser = result.rows[0];
+      return dbUser ? {
+        ...dbUser,
+        created_at: dbUser.created_at.toISOString(),
+        updated_at: dbUser.updated_at.toISOString(),
+        // avatar_url: dbUser.avatar_url // Ensure this matches User type if present
+      } : null;
+    },
   }
 };

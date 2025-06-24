@@ -29,7 +29,53 @@ type Query {
   getPetCareAdvice(question: String!): String! # AI Pet Care Q&A
   myOwnedVenues: [Venue!] # For shop owners to see their venues
   adminGetVenueClaims(status: String): [VenueClaim!] # For admins to list claims
+  getActivePetAlerts(latitude: Float, longitude: Float, radiusKm: Int): [PetAlert!] # For PawsSafers/admins
+  getMyCreatedAlerts: [PetAlert!] # For users to see alerts they created
 }
+
+# Pet Alert Types
+type PetAlert {
+  id: ID!
+  createdByUser: User # User who created the alert
+  alert_type: String! # e.g., 'lost_pet', 'found_pet', 'pet_in_danger', 'other'
+  description: String!
+  status: String! # e.g., 'active', 'investigating', 'resolved', 'cancelled'
+  latitude: Float!
+  longitude: Float!
+  location_accuracy: Int
+  pet_name: String
+  pet_species: String
+  pet_breed: String
+  pet_image_url: String
+  contact_phone: String
+  contact_email: String
+  last_seen_at: String # ISO8601 String
+  resolved_at: String  # ISO8601 String
+  created_at: String!
+  updated_at: String!
+}
+
+input CreatePetAlertInput {
+  alert_type: String!
+  description: String!
+  latitude: Float!
+  longitude: Float!
+  location_accuracy: Int
+  pet_name: String
+  pet_species: String
+  pet_breed: String
+  pet_image_url: String
+  contact_phone: String
+  contact_email: String
+  last_seen_at: String # ISO8601 String e.g. "YYYY-MM-DDTHH:mm:ssZ"
+}
+
+input UpdatePetAlertStatusInput {
+  alertId: ID!
+  newStatus: String! # e.g., 'investigating', 'resolved', 'cancelled'
+  notes: String # Optional notes from PawsSafer/Admin updating the status
+}
+
 
 # Venue Claim Types
 type VenueClaim {
@@ -93,6 +139,11 @@ type Mutation {
 
   # Admin mutations for venue claims
   adminReviewVenueClaim(input: AdminReviewVenueClaimInput!): VenueClaim!
+
+  # Pet Alert Mutations
+  createPetAlert(input: CreatePetAlertInput!): PetAlert!
+  updatePetAlertStatus(input: UpdatePetAlertStatusInput!): PetAlert!
+  cancelPetAlert(alertId: ID!): PetAlert
 }
 
 input ShopOwnerUpdateVenueInput {

@@ -62,6 +62,11 @@ const ProfilePage = () => {
         <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-color-muted)'}}>
           Manage your profile details and preferences here.
         </p>
+        <div style={{marginTop: '2rem', borderTop: '1px solid var(--current-border-color)', paddingTop: '1.5rem'}}>
+            <Link href="/profile/pets" className="button-style full-width" style={{marginBottom: '0.75rem'}}>My Pets</Link>
+            <Link href="/profile/my-alerts" className="button-style full-width secondary">My Reported Alerts</Link>
+            {/* Add other profile links like "Edit Profile Details", "My Reviews" here */}
+        </div>
       </div>
 
       <div className={styles.authForm} style={{ marginTop: 0, flex: '1 1 300px', maxWidth: '450px' }}>
