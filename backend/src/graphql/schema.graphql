@@ -39,6 +39,77 @@ type Mutation {
   addReview(input: CreateReviewInput!): Review!
   updateReview(reviewId: ID!, input: UpdateReviewInput!): Review
   deleteReview(reviewId: ID!): Boolean
+
+  # Admin mutations for venues
+  adminCreateVenue(input: AdminCreateVenueInput!): Venue!
+  adminUpdateVenue(id: ID!, input: AdminUpdateVenueInput!): Venue
+  adminDeleteVenue(id: ID!): Boolean
+}
+
+input AdminCreateVenueInput {
+  owner_user_id: ID # Optional: Link to a user who owns/manages the venue
+  name: String!
+  address: String
+  city: String
+  state_province: String
+  postal_code: String
+  country: String
+  latitude: Float!
+  longitude: Float!
+  phone_number: String
+  website: String
+  description: String
+  opening_hours: JSON # Assuming JSON string or mapped scalar
+  type: String! # e.g., "cafe", "park", "store"
+
+  pet_policy_summary: String
+  pet_policy_details: String
+  allows_off_leash: Boolean
+  has_indoor_seating_for_pets: Boolean
+  has_outdoor_seating_for_pets: Boolean
+  water_bowls_provided: Boolean
+  pet_treats_available: Boolean
+  pet_menu_available: Boolean
+  dedicated_pet_area: Boolean
+  weight_limit_kg: Float
+  carrier_required: Boolean
+  additional_pet_services: String
+
+  status: String # e.g., 'active', 'pending_approval', 'rejected'
+  google_place_id: String # Optional
+}
+
+input AdminUpdateVenueInput {
+  owner_user_id: ID
+  name: String
+  address: String
+  city: String
+  state_province: String
+  postal_code: String
+  country: String
+  latitude: Float
+  longitude: Float
+  phone_number: String
+  website: String
+  description: String
+  opening_hours: JSON
+  type: String
+
+  pet_policy_summary: String
+  pet_policy_details: String
+  allows_off_leash: Boolean
+  has_indoor_seating_for_pets: Boolean
+  has_outdoor_seating_for_pets: Boolean
+  water_bowls_provided: Boolean
+  pet_treats_available: Boolean
+  pet_menu_available: Boolean
+  dedicated_pet_area: Boolean
+  weight_limit_kg: Float
+  carrier_required: Boolean
+  additional_pet_services: String
+
+  status: String
+  google_place_id: String
 }
 
 type Review {

@@ -1,4 +1,4 @@
-import { generateToken, hashPassword, comparePassword } from '../utils/auth';
+import { generateToken, hashPassword, comparePassword, ensureAdmin } from '../utils/auth';
 import { generateTextFromGemini } from '../utils/gemini';
 import { GraphQLError } from 'graphql';
 import { pgPool } from '../config/db'; // Import the pgPool
@@ -596,6 +596,119 @@ export const resolvers: Resolvers = {
       const query = 'DELETE FROM pets WHERE id = $1 AND user_id = $2 RETURNING id;';
       const result = await pgPool.query(query, [id, context.userId]);
       return result.rowCount === 1;
+    },
+
+    // ADMIN VENUE MUTATIONS
+    adminCreateVenue: async (_parent: any, { input }: { input: any }, context: ResolverContext) => {
+      await ensureAdmin(context); // Authorize admin
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      const { owner_user_id, name, address, city, state_province, postal_code, country, latitude, longitude, phone_number, website, description, opening_hours, type, pet_policy_summary, pet_policy_details, allows_off_leash, has_indoor_seating_for_pets, has_outdoor_seating_for_pets, water_bowls_provided, pet_treats_available, pet_menu_available, dedicated_pet_area, weight_limit_kg, carrier_required, additional_pet_services, status, google_place_id } = input;
+
+      const query = `
+        INSERT INTO venues (owner_user_id, name, address, city, state_province, postal_code, country, latitude, longitude, phone_number, website, description, opening_hours, type, pet_policy_summary, pet_policy_details, allows_off_leash, has_indoor_seating_for_pets, has_outdoor_seating_for_pets, water_bowls_provided, pet_treats_available, pet_menu_available, dedicated_pet_area, weight_limit_kg, carrier_required, additional_pet_services, status, google_place_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        RETURNING *;
+      `;
+      const values = [owner_user_id, name, address, city, state_province, postal_code, country, latitude, longitude, phone_number, website, description, opening_hours, type, pet_policy_summary, pet_policy_details, allows_off_leash, has_indoor_seating_for_pets, has_outdoor_seating_for_pets, water_bowls_provided, pet_treats_available, pet_menu_available, dedicated_pet_area, weight_limit_kg, carrier_required, additional_pet_services, status ?? 'pending_approval', google_place_id];
+
+      try {
+        const result = await pgPool.query<DbVenue>(query, values);
+        const newVenue = result.rows[0];
+        return { // Map to GraphQL Venue type
+          ...newVenue,
+          latitude: parseFloat(newVenue.latitude as any),
+          longitude: parseFloat(newVenue.longitude as any),
+          weight_limit_kg: newVenue.weight_limit_kg ? parseFloat(newVenue.weight_limit_kg as any) : null,
+          created_at: newVenue.created_at.toISOString(),
+          updated_at: newVenue.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error in adminCreateVenue:", dbError);
+        throw new GraphQLError('Failed to create venue.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    adminUpdateVenue: async (_parent: any, { id, input }: { id: string, input: any }, context: ResolverContext) => {
+      await ensureAdmin(context);
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      let valueCount = 1;
+
+      // Dynamically build SET clause based on provided input fields
+      Object.keys(input).forEach(key => {
+        if (input[key] !== undefined) {
+          // Ensure snake_case for DB columns if GraphQL uses camelCase for some (though schema is snake_case mostly)
+          setClauses.push(`${key} = $${valueCount++}`);
+          values.push(input[key]);
+        }
+      });
+
+      if (setClauses.length === 0) {
+        throw new GraphQLError('No update fields provided', { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+
+      setClauses.push(`updated_at = CURRENT_TIMESTAMP`); // Always update this timestamp
+
+      const query = `
+        UPDATE venues SET ${setClauses.join(', ')}
+        WHERE id = $${valueCount++}
+        RETURNING *;
+      `;
+      values.push(id);
+
+      try {
+        const result = await pgPool.query<DbVenue>(query, values);
+        if (result.rows.length === 0) {
+          throw new GraphQLError('Venue not found or update failed', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const updatedVenue = result.rows[0];
+        return {
+          ...updatedVenue,
+          latitude: parseFloat(updatedVenue.latitude as any),
+          longitude: parseFloat(updatedVenue.longitude as any),
+          weight_limit_kg: updatedVenue.weight_limit_kg ? parseFloat(updatedVenue.weight_limit_kg as any) : null,
+          created_at: updatedVenue.created_at.toISOString(),
+          updated_at: updatedVenue.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error in adminUpdateVenue:", dbError);
+        if (dbError.extensions?.code === 'NOT_FOUND') throw dbError;
+        throw new GraphQLError('Failed to update venue.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
+    adminDeleteVenue: async (_parent: any, { id }: { id: string }, context: ResolverContext) => {
+      await ensureAdmin(context);
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      // Optional: Check if venue has associated reviews and decide on deletion policy.
+      // For now, simple delete. If FK constraints are 'ON DELETE CASCADE' for reviews.venue_id, reviews will be deleted.
+      // Otherwise, they might be orphaned or prevent deletion if 'ON DELETE RESTRICT'.
+      // For simplicity, we'll assume reviews are either cascaded or deletion is allowed.
+
+      const query = 'DELETE FROM venues WHERE id = $1 RETURNING id;';
+      try {
+        const result = await pgPool.query(query, [id]);
+        return result.rowCount === 1; // True if one row was deleted
+      } catch (dbError: any) {
+        console.error("Error in adminDeleteVenue:", dbError);
+        // Check for foreign key violation if reviews are not set to cascade delete
+        if (dbError.code === '23503') { // PostgreSQL foreign key violation error code
+             throw new GraphQLError('Cannot delete venue. It may have associated reviews or other dependent data.', {
+                extensions: { code: 'BAD_REQUEST', originalError: "Foreign key constraint violation." }, // Or a more specific code
+            });
+        }
+        throw new GraphQLError('Failed to delete venue.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
     },
 
     addReview: async (_parent: any, { input }: { input: any }, context: ResolverContext) => {
