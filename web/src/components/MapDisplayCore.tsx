@@ -1,8 +1,8 @@
 'use client'; // This is a client component
 
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet'; // Import L for custom icons if needed later
+import React, { useEffect, useRef } from 'react'; // Added useEffect, useRef
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'; // Added useMap
+import L, { LatLngExpression } from 'leaflet'; // Import L and LatLngExpression
 import Link from 'next/link'; // Import Link for navigation
 import Image from 'next/image'; // Import Image for thumbnails
 
@@ -53,14 +53,27 @@ interface MapDisplayCoreProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   venues?: Venue[];
-  onViewReviews: (venueId: string, venueName: string) => void; // Added prop
+  onViewReviews: (venueId: string, venueName: string) => void;
+  userLocation?: { lat: number; lng: number } | null; // Added userLocation
 }
+
+// Component to handle map re-centering when userLocation changes
+const UserLocationUpdater: React.FC<{ userLocation: { lat: number; lng: number } | null }> = ({ userLocation }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (userLocation) {
+      map.setView([userLocation.lat, userLocation.lng], 14); // Zoom level 14 when centering on user
+    }
+  }, [userLocation, map]);
+  return null; // This component does not render anything itself
+};
 
 const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
   initialCenter = [35.6895, 139.6917], // Default to Tokyo
   initialZoom = 13,
   venues = [],
-  onViewReviews, // Destructure the new prop
+  onViewReviews,
+  userLocation, // Destructure the new prop
 }) => {
   // Ensure Leaflet's CSS is loaded. This is usually done globally,
   // but can be an issue with dynamic imports if not handled carefully.
@@ -88,14 +101,20 @@ const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
 
   return (
     <MapContainer
-      center={initialCenter}
-      zoom={initialZoom}
-      style={{ height: '100%', width: '100%' }} // Ensure map takes up space
+      center={userLocation ? [userLocation.lat, userLocation.lng] : initialCenter}
+      zoom={userLocation ? 14 : initialZoom} // Higher zoom if user location is set
+      style={{ height: '100%', width: '100%' }}
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
+      <UserLocationUpdater userLocation={userLocation} />
+      {userLocation && (
+        <Marker position={[userLocation.lat, userLocation.lng]} /* icon={userLocationIcon} // Optional: custom icon */ >
+          <Popup>You are here!</Popup>
+        </Marker>
+      )}
       {venues.map(venue => (
         <Marker key={venue.id} position={[venue.latitude, venue.longitude]}>
           <Popup minWidth={250}> {/* Set a minWidth for better layout */}

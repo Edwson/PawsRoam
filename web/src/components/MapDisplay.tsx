@@ -14,7 +14,8 @@ interface MapDisplayProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   venues?: Venue[];
-  onViewReviews: (venueId: string, venueName: string) => void; // Added prop
+  onViewReviews: (venueId: string, venueName: string) => void;
+  userLocation?: { lat: number; lng: number } | null; // Add userLocation prop
 }
 
 // Dynamically import the MapDisplayCore component with SSR turned off
