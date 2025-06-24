@@ -3,8 +3,8 @@
 # Explicit build settings for the Next.js app located in the 'web' subdirectory.
 # This configuration assumes Netlify's build process starts from the repository root.
 [build]
-  command = "cd web && npm install && npm run build" # Install deps in web/ then build
-  publish = "web/.next/"                             # Publish directory relative to the repository root
+  command = "cd web && npm install --legacy-peer-deps && npm run build" # Use --legacy-peer-deps for dependency resolution
+  publish = "web/.next/"                                              # Publish directory relative to the repository root
 
 # Essential plugin for Next.js on Netlify.
 # This plugin handles most of the Next.js specific configurations,
