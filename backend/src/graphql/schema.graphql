@@ -54,6 +54,16 @@ type Mutation {
 
   # Admin Venue Image Mutation
   adminUpdateVenueImage(venueId: ID!, imageUrl: String!): Venue!
+
+  # Admin User Management
+  adminUpdateUser(userId: ID!, input: AdminUpdateUserInput!): User
+}
+
+input AdminUpdateUserInput {
+  name: String
+  email: String # Consider if email updates should have extra verification
+  role: String   # e.g., "user", "admin", "business_owner"
+  status: String # e.g., "active", "suspended"
 }
 
 input AdminCreateVenueInput {

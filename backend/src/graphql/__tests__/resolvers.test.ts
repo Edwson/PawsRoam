@@ -645,6 +645,75 @@ describe('GraphQL Resolvers', () => {
         expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Role check + SELECT attempt
       });
     });
+
+    describe('adminUpdateUser', () => {
+      const targetUserId = 'user-to-update-id';
+      const updateInput = { role: 'business_owner', status: 'active' };
+      const mockDbUserUpdated = {
+        id: targetUserId,
+        email: 'test@example.com',
+        name: 'Test User',
+        role: 'business_owner',
+        status: 'active',
+        created_at: new Date(),
+        updated_at: new Date(),
+        // avatar_url might be undefined if not part of DbUser yet
+      };
+      const expectedGqlUser = {
+        ...mockDbUserUpdated,
+        avatar_url: undefined, // Explicitly undefined if not in DbUser/User type for this test
+        created_at: mockDbUserUpdated.created_at.toISOString(),
+        updated_at: mockDbUserUpdated.updated_at.toISOString(),
+      };
+
+      it('should allow admin to update a user role and status', async () => {
+        mockAdminUserRole(); // Current user is admin
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockDbUserUpdated] }); // DB update response
+
+        const result = await resolvers.Mutation!.adminUpdateUser!(
+          null,
+          { userId: targetUserId, input: updateInput },
+          adminContext,
+          {} as any
+        );
+
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Role check + UPDATE user
+        const updateQueryCall = mockPgPoolQuery.mock.calls[1];
+        expect(updateQueryCall[0]).toContain('UPDATE users SET role = $1, status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3');
+        expect(updateQueryCall[1]).toEqual([updateInput.role, updateInput.status, targetUserId]);
+        expect(result).toEqual(expectedGqlUser);
+      });
+
+      it('should prevent non-admin from updating a user', async () => {
+        mockNonAdminUserRole();
+        await expect(
+          resolvers.Mutation!.adminUpdateUser!(null, { userId: targetUserId, input: updateInput }, nonAdminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authorized to perform this action', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only role check
+      });
+
+      it('should throw error if user to update is not found', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // User not found by UPDATE
+
+        await expect(
+          resolvers.Mutation!.adminUpdateUser!(null, { userId: targetUserId, input: updateInput }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User not found or update failed', { extensions: { code: 'NOT_FOUND' }}));
+      });
+
+      it('should throw error if trying to update email to an existing one', async () => {
+        mockAdminUserRole();
+        const emailUpdateInput = { email: 'existing@example.com' };
+        const dbError = new Error('Unique constraint violation');
+        (dbError as any).code = '23505'; // PostgreSQL unique violation
+        (dbError as any).constraint = 'users_email_key';
+        mockPgPoolQuery.mockRejectedValueOnce(dbError);
+
+        await expect(
+          resolvers.Mutation!.adminUpdateUser!(null, { userId: targetUserId, input: emailUpdateInput }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Email address is already in use by another account.', { extensions: { code: 'BAD_USER_INPUT' }}));
+      });
+    });
   });
 
   // Test for getPetCareAdvice
