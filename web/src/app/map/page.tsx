@@ -24,6 +24,7 @@ const SEARCH_VENUES_QUERY = gql`
       opening_hours # This is JSON, ensure MapDisplayCore can handle or format it
       average_rating # Added
       review_count   # Added
+      image_url # Fetch venue image URL
     }
   }
 `;
@@ -43,8 +44,9 @@ interface Venue {
   has_outdoor_seating_for_pets?: boolean | null;
   water_bowls_provided?: boolean | null;
   opening_hours?: any | null;
-  average_rating?: number | null; // Added
-  review_count?: number | null;   // Added
+  average_rating?: number | null;
+  review_count?: number | null;
+  image_url?: string | null; // Added image_url
 }
 
 const MapPage = () => {

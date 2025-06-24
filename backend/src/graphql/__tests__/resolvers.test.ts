@@ -576,5 +576,74 @@ describe('GraphQL Resolvers', () => {
          expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Both ownership check and update attempt
       });
     });
+
+    describe('adminUpdateVenueImage', () => {
+      const mockVenueId = 'venue-xyz-123';
+      const newImageUrl = 'http://example.com/new-venue-image.jpg';
+      const mockExistingVenue = {
+        id: mockVenueId,
+        name: 'Test Venue',
+        type: 'cafe',
+        latitude: 34.05,
+        longitude: -118.25,
+        created_at: new Date('2023-03-01T00:00:00.000Z'),
+        updated_at: new Date('2023-03-01T00:00:00.000Z'),
+        // other necessary fields for DbVenue
+      };
+
+      it('should allow admin to update venue image_url and return updated venue', async () => {
+        mockAdminUserRole(); // User is admin
+        // Mock for the SELECT query to fetch venue details
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockExistingVenue] });
+        const consoleSpy = jest.spyOn(console, 'log');
+
+        const result = await resolvers.Mutation!.adminUpdateVenueImage!(
+          null,
+          { venueId: mockVenueId, imageUrl: newImageUrl },
+          adminContext,
+          {} as any
+        );
+
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Role check + SELECT venue
+        expect(mockPgPoolQuery.mock.calls[1][0]).toBe('SELECT * FROM venues WHERE id = $1');
+        expect(mockPgPoolQuery.mock.calls[1][1]).toEqual([mockVenueId]);
+        expect(consoleSpy).toHaveBeenCalledWith(`Conceptually updated image_url for venue ${mockVenueId} to ${newImageUrl}`);
+
+        expect(result.id).toBe(mockVenueId);
+        expect(result.image_url).toBe(newImageUrl);
+        expect(result.name).toBe(mockExistingVenue.name);
+        expect(new Date(result.updated_at).getTime()).toBeGreaterThan(mockExistingVenue.updated_at.getTime());
+
+        consoleSpy.mockRestore();
+      });
+
+      it('should throw error if user is not admin', async () => {
+        mockNonAdminUserRole();
+        await expect(
+          resolvers.Mutation!.adminUpdateVenueImage!(null, { venueId: mockVenueId, imageUrl: newImageUrl }, nonAdminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authorized to perform this action', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only role check
+      });
+
+      it('should throw error if venue not found', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // Venue not found by SELECT
+
+        await expect(
+          resolvers.Mutation!.adminUpdateVenueImage!(null, { venueId: 'non-existent-id', imageUrl: newImageUrl }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Venue not found.', { extensions: { code: 'NOT_FOUND' } }));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Role check + SELECT attempt
+      });
+
+      it('should handle database error during venue fetch for image update', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockRejectedValueOnce(new Error('DB SELECT failed')); // SELECT fails
+
+        await expect(
+          resolvers.Mutation!.adminUpdateVenueImage!(null, { venueId: mockVenueId, imageUrl: newImageUrl }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Failed to update venue image.', { extensions: { code: 'INTERNAL_SERVER_ERROR' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Role check + SELECT attempt
+      });
+    });
   });
 });

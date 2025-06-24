@@ -4,6 +4,9 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet'; // Import L for custom icons if needed later
 import Link from 'next/link'; // Import Link for navigation
+import Image from 'next/image'; // Import Image for thumbnails
+
+const defaultVenueImage = "/default-venue-image.png"; // Define default image
 
 // Fix for default icon issue with Webpack/Next.js
 // (delete L.Icon.Default.prototype._getIconUrl; has been removed in recent Leaflet versions, direct path setting is better)
@@ -43,6 +46,7 @@ interface Venue {
   opening_hours?: any | null;
   average_rating?: number | null;
   review_count?: number | null;
+  image_url?: string | null; // Added image_url
 }
 
 interface MapDisplayCoreProps {
@@ -96,10 +100,23 @@ const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
         <Marker key={venue.id} position={[venue.latitude, venue.longitude]}>
           <Popup minWidth={250}> {/* Set a minWidth for better layout */}
             <div style={{ fontSize: '1rem' }}> {/* Slightly larger base font for popup */}
+              {venue.image_url && (
+                <div style={{ marginBottom: '0.5rem', borderRadius: '4px', overflow: 'hidden' }}>
+                  <Image
+                    src={venue.image_url}
+                    alt={`Image of ${venue.name}`}
+                    width={230} // Popup width is min 250, so slightly less for padding
+                    height={130} // Maintain an aspect ratio (e.g., ~16:9)
+                    style={{ objectFit: 'cover', width: '100%', height: 'auto', display: 'block' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} // Hide on error
+                  />
+                </div>
+              )}
               <h4 style={{ marginTop: 0, marginBottom: '0.5rem', color: 'var(--primary-color)' }}>{venue.name}</h4>
               <p style={{ margin: '0.25rem 0' }}><strong>Type:</strong> {venue.type}</p>
               {venue.address && <p style={{ margin: '0.25rem 0' }}><strong>Address:</strong> {venue.address}{venue.city ? `, ${venue.city}` : ''}</p>}
-              {venue.description && <p style={{ margin: '0.25rem 0' }}>{venue.description}</p>}
+              {/* Limit description length in popup */}
+              {venue.description && <p style={{ margin: '0.25rem 0', fontSize: '0.9em', maxHeight: '60px', overflowY: 'auto' }}>{venue.description.substring(0,100)}{venue.description.length > 100 ? '...' : ''}</p>}
               {venue.pet_policy_summary && <p style={{ margin: '0.25rem 0', fontStyle: 'italic' }}>Pet Policy: {venue.pet_policy_summary}</p>}
 
               <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: '0.5rem', fontSize: '0.9rem' }}>
