@@ -6,10 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { gql, useQuery, useMutation } from '@apollo/client';
 import Link from 'next/link';
 import Image from 'next/image';
-import AppProviders from '@/components/AppProviders'; // For PawsSaferLayout
-import PawsSaferLayout from '@/app/paws-safer/layout'; // Explicitly wrap if needed, or rely on Next.js structure.
-                                                // Assuming PawsSaferLayout is correctly applied by directory structure.
-import MainLayout from '@/components/Layout'; // To ensure main layout structure
+import AppProviders from '@/components/AppProviders';
+import PawsSaferLayout from '@/app/paws-safer/layout';
+import MainLayout from '@/components/Layout';
+import MapDisplay from '@/components/MapDisplay'; // Import MapDisplay
 
 const defaultPetImage = "/default-pet-avatar.png";
 const defaultUserAvatar = "/default-avatar.png";
@@ -211,9 +211,20 @@ const AlertDetailPageContent: React.FC = () => {
         <h4>Location Details</h4>
         <p><strong style={labelStyle}>Coordinates:</strong> {alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)}</p>
         {alert.location_accuracy && <p><strong style={labelStyle}>Accuracy:</strong> ~{alert.location_accuracy} meters</p>}
-        <div style={mapPlaceholderStyle}>
-            Map Placeholder for ({alert.latitude.toFixed(2)}, {alert.longitude.toFixed(2)}) <br/>
-            (Actual map component to be integrated here)
+        <div style={{ height: '350px', width: '100%', marginTop: '1rem', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--current-border-color)' }}>
+          <MapDisplay
+            initialCenter={[alert.latitude, alert.longitude]}
+            initialZoom={15}
+            venues={[{ // Pass the alert location as a single "venue" for the marker
+              id: alert.id,
+              name: alert.pet_name ? `${alert.alert_type.replace('_',' ')} - ${alert.pet_name}` : alert.alert_type.replace('_',' '),
+              latitude: alert.latitude,
+              longitude: alert.longitude,
+              type: alert.alert_type, // Use alert_type for the marker type if MapDisplay uses it
+            }]}
+            onViewReviews={() => {}} // No-op for this context
+            // userLocation can be omitted if not relevant here or set to null
+          />
         </div>
       </div>
 
