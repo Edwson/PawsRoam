@@ -4,9 +4,13 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { gql, useQuery, useMutation } from '@apollo/client';
-import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard'; // Assuming this handles auth redirection
+// AdminRouteGuard is handled by admin/layout.tsx, so direct import here might not be needed if page is child of layout.
+// import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard';
 import Layout from '@/components/Layout'; // Standard layout
 import AppProviders from '@/components/AppProviders'; // For Apollo Client
+import Image from 'next/image'; // Import Image for thumbnails
+
+const defaultVenueImage = "/default-venue-image.png"; // Define default image
 
 // GraphQL query to fetch venues (can use existing searchVenues or a dedicated admin one)
 const GET_VENUES_QUERY = gql`
@@ -19,7 +23,7 @@ const GET_VENUES_QUERY = gql`
       status
       average_rating
       review_count
-      # Add other fields needed for the list display
+      image_url # Fetch image_url
     }
   }
 `;
@@ -39,6 +43,7 @@ interface VenueForList {
   status?: string | null;
   average_rating?: number | null;
   review_count?: number | null;
+  image_url?: string | null; // Add to interface
 }
 
 const venueTableStyle: React.CSSProperties = {
@@ -171,6 +176,7 @@ const AdminVenuesPageContent: React.FC = () => {
         <table style={venueTableStyle}>
           <thead>
             <tr>
+              <th style={{...thStyle, width: '50px'}}>Image</th>
               <th style={thStyle}>ID</th>
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Type</th>
@@ -183,6 +189,16 @@ const AdminVenuesPageContent: React.FC = () => {
           <tbody>
             {venues.map((venue) => (
               <tr key={venue.id}>
+                <td style={tdStyle}>
+                  <Image
+                    src={venue.image_url || defaultVenueImage}
+                    alt={venue.name || 'Venue image'}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: '4px' }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = defaultVenueImage; }}
+                  />
+                </td>
                 <td style={tdStyle}><small>{venue.id}</small></td>
                 <td style={tdStyle}>{venue.name}</td>
                 <td style={tdStyle}>{venue.type}</td>

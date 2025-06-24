@@ -50,6 +50,9 @@ type Mutation {
 
   # Pet mutations
   updatePetAvatar(petId: ID!, imageUrl: String!): Pet!
+
+  # Admin Venue Image Mutation
+  adminUpdateVenueImage(venueId: ID!, imageUrl: String!): Venue!
 }
 
 input AdminCreateVenueInput {
@@ -212,6 +215,7 @@ type Venue {
   average_rating: Float # From venues table
   review_count: Int   # From venues table
   reviews: [Review!] # Associated reviews for the venue
+  image_url: String # URL for the venue's main image
 
   created_at: String # Typically represented as ISO8601 String
   updated_at: String # Typically represented as ISO8601 String

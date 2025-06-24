@@ -57,6 +57,7 @@ const GET_VENUE_BY_ID_QUERY = gql`
       additional_pet_services
       status
       google_place_id
+      image_url # Ensure image_url is fetched
     }
   }
 `;

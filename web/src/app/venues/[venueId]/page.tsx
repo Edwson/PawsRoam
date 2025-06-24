@@ -11,6 +11,10 @@ import ReviewList from '@/components/reviews/ReviewList';
 import AddReviewForm from '@/components/forms/AddReviewForm';
 import AppProviders from '@/components/AppProviders'; // For Apollo Client context if not global
 import Layout from '@/components/Layout'; // Standard page layout
+import Image from 'next/image'; // Import Image component
+
+const defaultVenueImage = "/default-venue-image.png"; // Define default image
+
 
 // Define GraphQL query for fetching a single venue by ID
 // This query should align with your backend schema and include reviews
@@ -44,6 +48,7 @@ const GET_VENUE_BY_ID = gql`
       additional_pet_services
       average_rating
       review_count
+      image_url # Fetch image_url
       reviews {
         id
         rating
@@ -55,7 +60,6 @@ const GET_VENUE_BY_ID = gql`
         }
         created_at
       }
-      # Add other fields as needed based on your Venue GQL type
     }
   }
 `;
@@ -104,6 +108,7 @@ interface Venue {
   average_rating?: number | null;
   review_count?: number | null;
   reviews: Review[];
+  image_url?: string | null; // Add to interface
 }
 
 const VenueDetailPageContent = () => {
@@ -130,7 +135,22 @@ const VenueDetailPageContent = () => {
 
   return (
     <div style={{ padding: '20px' }}>
-      <Link href="/map">&larr; Back to Map</Link>
+      <Link href="/map" style={{ display: 'inline-block', marginBottom: '1rem' }}>&larr; Back to Map</Link>
+
+      {venue.image_url && (
+        <div style={{ marginBottom: '1.5rem', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+          <Image
+            src={venue.image_url}
+            alt={`Image of ${venue.name}`}
+            width={800} // Adjust width as needed for page layout
+            height={450} // Adjust height for a 16:9 aspect ratio, or as desired
+            style={{ objectFit: 'cover', width: '100%', height: 'auto', display: 'block' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} // Hide if image fails to load
+            priority // Prioritize loading if it's LCP
+          />
+        </div>
+      )}
+
       <h1>{venue.name}</h1>
       <p><strong>Type:</strong> {venue.type}</p>
       <p><strong>Address:</strong> {`${venue.address || ''}, ${venue.city || ''}, ${venue.state_province || ''} ${venue.postal_code || ''}, ${venue.country || ''}`.replace(/ , |^, | ,$/g, '') || 'N/A'}</p>
