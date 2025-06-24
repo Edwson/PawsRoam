@@ -98,6 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <nav style={navStyle}>
           <Link href="/" style={navLinkStyle}>Home</Link>
           <Link href="/map" style={navLinkStyle}>Map Discovery</Link>
+          <Link href="/alerts/create" style={navLinkStyle} className="button-style primary-outline">🚨 Report Alert</Link> {/* Create Alert Link */}
           <Link href="/ai-pet-care" style={navLinkStyle}>Pet Care AI</Link>
           {user ? (
             <>
