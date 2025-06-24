@@ -52,6 +52,10 @@ interface Venue {
 const MapPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+
 
   const [queryVariables, setQueryVariables] = useState({
     filterByName: '',
@@ -92,6 +96,30 @@ const MapPage = () => {
     refetchVenues();
   };
 
+  const handleUseMyLocation = () => {
+    if (navigator.geolocation) {
+      setIsLocating(true);
+      setLocationError(null);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+          setLocationError(`Error: ${error.message}. Please ensure location services are enabled.`);
+          setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      setLocationError("Geolocation is not supported by your browser.");
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' /* Adjust height based on your layout */ }}>
       <h2>Map Discovery</h2>
@@ -127,20 +155,23 @@ const MapPage = () => {
           <option value="hotel">Hotels</option>
           {/* Add more types as defined in your backend/data */}
         </select>
-        {/* A button to manually trigger search if not using useEffect-based refetching for all changes */}
-        {/* <button onClick={handleSearch} disabled={loading}>Search</button> */}
+        <button onClick={handleUseMyLocation} disabled={isLocating} className="button-style secondary">
+          {isLocating ? 'Locating...' : '📍 Use My Location'}
+        </button>
       </div>
 
+      {locationError && <p className="error-message" style={{marginBottom: '1rem'}}>{locationError}</p>}
       {loading && <p>Loading venues...</p>}
       {error && <p className="error-message">Error fetching venues: {error.message}</p>}
 
       <div style={{ flexGrow: 1, border: '1px solid var(--current-border-color)', borderRadius: '4px', overflow: 'hidden' }}>
         {!loading && !error && (
           <MapDisplay
-            initialCenter={[35.6895, 139.6917]}
+            initialCenter={[35.6895, 139.6917]} // Default if no userLocation yet
             initialZoom={11}
             venues={venuesToDisplay}
-            onViewReviews={handleOpenReviewModal} // Pass the handler
+            onViewReviews={handleOpenReviewModal}
+            userLocation={userLocation} // Pass userLocation
           />
         )}
       </div>
