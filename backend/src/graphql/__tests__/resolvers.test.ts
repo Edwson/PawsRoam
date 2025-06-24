@@ -855,6 +855,99 @@ describe('GraphQL Resolvers', () => {
             expect(mockPgPoolQuery).not.toHaveBeenCalled();
         });
     });
+
+    describe('shopOwnerUpdateVenueDetails', () => {
+      const mockShopOwnerContext = { userId: 'shop-owner-id-for-update', role: 'business_owner' };
+      const mockAdminContext = { userId: 'admin-id-for-update', role: 'admin' };
+      const venueId = 'venue-to-update-by-owner';
+      const updateInput = { name: "Owner Updated Cafe Name", type: "cafe" }; // ShopOwnerUpdateVenueInput
+
+      const mockCurrentVenueOwned = { id: venueId, owner_user_id: mockShopOwnerContext.userId, name: "Original Name", type: "restaurant", latitude: '30.0', longitude: '130.0', created_at: new Date(), updated_at: new Date() };
+      const mockUpdatedVenueResponse = { ...mockCurrentVenueOwned, ...updateInput, updated_at: new Date() };
+
+      it('should allow a shop owner to update their own venue', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockCurrentVenueOwned] }); // For ownership check
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockUpdatedVenueResponse] }); // For update
+
+        const result = await resolvers.Mutation!.shopOwnerUpdateVenueDetails!(null, { venueId, input: updateInput }, mockShopOwnerContext, {} as any);
+
+        expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockShopOwnerContext);
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2);
+        expect(mockPgPoolQuery.mock.calls[0][0]).toBe('SELECT owner_user_id FROM venues WHERE id = $1'); // Ownership check query
+        expect(mockPgPoolQuery.mock.calls[0][1]).toEqual([venueId]);
+        expect(mockPgPoolQuery.mock.calls[1][0]).toContain('UPDATE venues SET name = $1, type = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3');
+        expect(mockPgPoolQuery.mock.calls[1][1]).toEqual([updateInput.name, updateInput.type, venueId]);
+        expect(result.name).toBe(updateInput.name);
+        expect(result.type).toBe(updateInput.type);
+      });
+
+      it('should prevent shop owner from updating status or owner_user_id (fields not in ShopOwnerUpdateVenueInput)', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockCurrentVenueOwned] });
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockUpdatedVenueResponse] });
+
+        // Input includes status and owner_user_id, but resolver should ignore them for SET clause
+        const maliciousInput = { ...updateInput, status: 'active', owner_user_id: 'another-user-id' };
+        await resolvers.Mutation!.shopOwnerUpdateVenueDetails!(null, { venueId, input: maliciousInput }, mockShopOwnerContext, {} as any);
+
+        const updateQuery = mockPgPoolQuery.mock.calls[1][0] as string;
+        expect(updateQuery).not.toContain('status =');
+        expect(updateQuery).not.toContain('owner_user_id =');
+      });
+
+      it('should prevent shop owner from updating a venue they do not own', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ owner_user_id: 'different-owner-id' }] }); // Venue owned by someone else
+
+        await expect(
+          resolvers.Mutation!.shopOwnerUpdateVenueDetails!(null, { venueId, input: updateInput }, mockShopOwnerContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User not authorized to update this venue.', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only ownership check
+      });
+
+      it('should allow admin to update any venue via shopOwnerUpdateVenueDetails (if ownership check is bypassed for admin)', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockAdminContext);
+        // No ownership check query mock needed here as admin bypasses it in resolver logic
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockUpdatedVenueResponse] }); // For update
+
+        await resolvers.Mutation!.shopOwnerUpdateVenueDetails!(null, { venueId, input: updateInput }, mockAdminContext, {} as any);
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only the UPDATE query
+        expect(mockPgPoolQuery.mock.calls[0][0]).toContain('UPDATE venues SET name = $1, type = $2');
+      });
+    });
+
+    describe('shopOwnerUpdateVenueImage', () => {
+        const mockShopOwnerContext = { userId: 'shop-owner-id-for-image-update', role: 'business_owner' };
+        const venueId = 'venue-for-image-update';
+        const newImageUrl = 'http://example.com/new-shop-venue.jpg';
+        const mockCurrentVenue = { id: venueId, owner_user_id: mockShopOwnerContext.userId, name: "Shop's Venue", latitude: '10.0', longitude: '10.0', type: 'store', created_at: new Date(), updated_at: new Date() };
+
+        it('should allow shop owner to update their venue image', async () => {
+            mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+            mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockCurrentVenue] }); // Ownership check
+            mockPgPoolQuery.mockResolvedValueOnce({ rows: [mockCurrentVenue] }); // SELECT after conceptual update
+
+            const consoleSpy = jest.spyOn(console, 'log');
+            const result = await resolvers.Mutation!.shopOwnerUpdateVenueImage!(null, { venueId, imageUrl: newImageUrl }, mockShopOwnerContext, {} as any);
+
+            expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockShopOwnerContext);
+            expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Ownership check + final SELECT
+            expect(consoleSpy).toHaveBeenCalledWith(`Conceptually updated image_url for venue ${venueId} to ${newImageUrl} by user ${mockShopOwnerContext.userId}`);
+            expect(result.image_url).toBe(newImageUrl);
+            consoleSpy.mockRestore();
+        });
+
+        it('should prevent shop owner from updating image of a venue they do not own', async () => {
+            mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+            mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ owner_user_id: 'another-owner' }] }); // Different owner
+
+            await expect(
+                resolvers.Mutation!.shopOwnerUpdateVenueImage!(null, { venueId, imageUrl: newImageUrl }, mockShopOwnerContext, {} as any)
+            ).rejects.toThrow('User not authorized to update image for this venue.');
+            expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only ownership check
+        });
+    });
   });
 
   // Test for getPetCareAdvice

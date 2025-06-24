@@ -5,13 +5,21 @@ import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { gql, useMutation } from '@apollo/client';
 import Image from 'next/image';
 
-// GraphQL Mutation for updating venue image
+// GraphQL Mutations
 const ADMIN_UPDATE_VENUE_IMAGE_MUTATION = gql`
   mutation AdminUpdateVenueImage($venueId: ID!, $imageUrl: String!) {
     adminUpdateVenueImage(venueId: $venueId, imageUrl: $imageUrl) {
       id
-      image_url # Ensure this is returned to update UI
-      # Potentially other venue fields if needed
+      image_url
+    }
+  }
+`;
+
+const SHOP_OWNER_UPDATE_VENUE_IMAGE_MUTATION = gql`
+  mutation ShopOwnerUpdateVenueImage($venueId: ID!, $imageUrl: String!) {
+    shopOwnerUpdateVenueImage(venueId: $venueId, imageUrl: $imageUrl) {
+      id
+      image_url
     }
   }
 `;
@@ -19,21 +27,32 @@ const ADMIN_UPDATE_VENUE_IMAGE_MUTATION = gql`
 interface VenueImageUploadProps {
   venueId: string;
   currentImageUrl?: string | null;
-  onUploadSuccess: (newImageUrl: string) => void; // Callback to update parent state
+  onUploadSuccess: (newImageUrl: string) => void;
+  mutationType: 'adminUpdateVenueImage' | 'shopOwnerUpdateVenueImage'; // To select the correct mutation
 }
 
-const defaultVenueImage = "/default-venue-image.png"; // Path to a default venue image in /public
+const defaultVenueImage = "/default-venue-image.png";
 
-const VenueImageUpload: React.FC<VenueImageUploadProps> = ({ venueId, currentImageUrl, onUploadSuccess }) => {
+const VenueImageUpload: React.FC<VenueImageUploadProps> = ({
+  venueId,
+  currentImageUrl,
+  onUploadSuccess,
+  mutationType = 'adminUpdateVenueImage' // Default to admin mutation
+}) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentImageUrl || null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [adminUpdateVenueImage, { loading }] = useMutation(ADMIN_UPDATE_VENUE_IMAGE_MUTATION, {
+  const mutationToUse = mutationType === 'shopOwnerUpdateVenueImage'
+    ? SHOP_OWNER_UPDATE_VENUE_IMAGE_MUTATION
+    : ADMIN_UPDATE_VENUE_IMAGE_MUTATION;
+
+  const [updateVenueImage, { loading }] = useMutation(mutationToUse, {
     onCompleted: (data) => {
-      const newUrl = data.adminUpdateVenueImage?.image_url;
+      // Access the result based on the mutationType
+      const newUrl = data[mutationType]?.image_url;
       if (newUrl) {
         setSuccessMessage('Venue image updated successfully!');
         setError(null);
@@ -47,7 +66,7 @@ const VenueImageUpload: React.FC<VenueImageUploadProps> = ({ venueId, currentIma
     onError: (err) => {
       setError(`Error updating venue image: ${err.message}`);
       setSuccessMessage(null);
-      console.error("Error updating venue image:", err);
+      console.error(`Error updating venue image via ${mutationType}:`, err);
       setTimeout(() => setError(null), 5000);
     }
   });
@@ -91,10 +110,10 @@ const VenueImageUpload: React.FC<VenueImageUploadProps> = ({ venueId, currentIma
     ];
     // const simulatedImageUrl = placeholderUrls[Math.floor(Math.random() * placeholderUrls.length)];
      // For stability in testing, using a more predictable placeholder:
-    const simulatedImageUrl = `https://picsum.photos/seed/${venueId}/400/300`;
-    console.log(`Simulating upload of ${selectedFile.name} for venue ${venueId}. Using URL: ${simulatedImageUrl}`);
+    const simulatedImageUrl = `https://picsum.photos/seed/${venueId}/${Date.now()}/400/300`; // Add timestamp for variety
+    console.log(`Simulating upload of ${selectedFile.name} for venue ${venueId} via ${mutationType}. Using URL: ${simulatedImageUrl}`);
 
-    await adminUpdateVenueImage({ variables: { venueId, imageUrl: simulatedImageUrl } });
+    await updateVenueImage({ variables: { venueId, imageUrl: simulatedImageUrl } });
   };
 
   useEffect(() => {
