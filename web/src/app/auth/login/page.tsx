@@ -46,7 +46,7 @@ const LoginPage = () => {
     }
     try {
       await loginUser({ variables: { email, password } });
-    } catch (err) {
+    } catch { // err was unused
       // Error is handled by onError in useMutation
     }
   };

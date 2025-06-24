@@ -55,10 +55,18 @@ interface Venue {
   allows_off_leash?: boolean | null;
   has_outdoor_seating_for_pets?: boolean | null;
   water_bowls_provided?: boolean | null;
-  opening_hours?: any | null;
+  opening_hours?: any | null; // JSON scalar, using 'any' is acceptable here or use a specific generated type if available
   average_rating?: number | null;
   review_count?: number | null;
   image_url?: string | null; // Added image_url
+}
+
+interface SearchVenuesQueryVariables {
+  filterByName?: string | null;
+  filterByType?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  radiusKm?: number | null;
 }
 
 const MapPage = () => {
@@ -70,7 +78,7 @@ const MapPage = () => {
   const [searchRadiusKm, setSearchRadiusKm] = useState<number>(10); // Default 10km
 
 
-  const [queryVariables, setQueryVariables] = useState<any>({
+  const [queryVariables, setQueryVariables] = useState<SearchVenuesQueryVariables>({
     filterByName: '',
     filterByType: '',
     latitude: null,

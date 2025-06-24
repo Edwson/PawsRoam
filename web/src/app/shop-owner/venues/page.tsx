@@ -1,7 +1,7 @@
 // web/src/app/shop-owner/venues/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react'; // Removed useState, useEffect
 import Link from 'next/link';
 import { gql, useQuery } from '@apollo/client';
 import Image from 'next/image'; // For venue image thumbnails
@@ -83,7 +83,7 @@ const MyVenuesPageContent: React.FC = () => {
   // }, []);
 
 
-  const { data, loading, error, refetch } = useQuery<{ myOwnedVenues: OwnedVenue[] }>(
+  const { data, loading, error, /* refetch */ } = useQuery<{ myOwnedVenues: OwnedVenue[] }>( // refetch was unused
     MY_OWNED_VENUES_QUERY,
     {
       // fetchPolicy: 'cache-and-network', // Useful if other actions might change this list

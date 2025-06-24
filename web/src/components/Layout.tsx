@@ -38,12 +38,12 @@ const navLinkStyle: React.CSSProperties = {
   transition: 'background-color 0.2s ease-in-out, color 0.2s ease-in-out',
 };
 
-const navLinkActiveStyle: React.CSSProperties = { // Example for active link (needs path checking)
-  ...navLinkStyle,
-  // backgroundColor: 'var(--primary-light)',
-  // color: 'var(--primary-dark)',
-  fontWeight: '500',
-};
+// const navLinkActiveStyle: React.CSSProperties = { // Unused variable
+//   ...navLinkStyle,
+//   // backgroundColor: 'var(--primary-light)',
+//   // color: 'var(--primary-dark)',
+//   fontWeight: '500',
+// };
 
 const mainStyle: React.CSSProperties = {
   padding: '2rem',

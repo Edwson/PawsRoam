@@ -1,7 +1,7 @@
 'use client'; // This is a client component
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { ApolloError, useApolloClient } from '@apollo/client';
+import { useApolloClient } from '@apollo/client'; // Removed ApolloError
 // You might want to define a User type that matches your GraphQL schema
 interface User {
   id: string;

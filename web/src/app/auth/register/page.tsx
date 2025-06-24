@@ -47,7 +47,7 @@ const RegisterPage = () => {
     }
     try {
       await registerUser({ variables: { email, password, name } });
-    } catch (err) {
+    } catch { // err was unused
       // Error is handled by onError in useMutation
     }
   };

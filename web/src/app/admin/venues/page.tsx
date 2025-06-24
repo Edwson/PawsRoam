@@ -4,8 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { gql, useQuery, useMutation } from '@apollo/client';
-// AdminRouteGuard is handled by admin/layout.tsx, so direct import here might not be needed if page is child of layout.
-// import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard';
+import { AdminRouteGuard } from '@/app/admin/AdminRouteGuard'; // Import AdminRouteGuard
 import Layout from '@/components/Layout'; // Standard layout
 import AppProviders from '@/components/AppProviders'; // For Apollo Client
 import Image from 'next/image'; // Import Image for thumbnails

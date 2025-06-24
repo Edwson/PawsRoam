@@ -31,7 +31,7 @@ export interface AdminCreateVenueInput {
   phone_number?: string | null;
   website?: string | null;
   description?: string | null;
-  opening_hours?: any | null; // JSON scalar
+  opening_hours?: any | null; // JSON scalar - using 'any' as it can be complex and is often stringified then parsed.
   type: string;
   pet_policy_summary?: string | null;
   pet_policy_details?: string | null;
@@ -52,6 +52,16 @@ export interface AdminCreateVenueInput {
 // Corresponds to `AdminUpdateVenueInput` in GraphQL schema
 // It's a partial of AdminCreateVenueInput, but all fields are optional.
 export type AdminUpdateVenueInput = Partial<AdminCreateVenueInput>;
+
+// Specific input type for Shop Owner when updating their venue details.
+// They should not be able to change owner_user_id or status directly.
+// Google Place ID might also be restricted post-creation.
+export type ShopOwnerUpdateVenueInput = Partial<Omit<AdminCreateVenueInput, 'owner_user_id' | 'status' | 'google_place_id'>>;
+
+// Specific input type for Shop Owner when creating a new venue.
+// owner_user_id and status will be set by the backend or have defaults.
+export type ShopOwnerCreateVenueInput = Omit<AdminCreateVenueInput, 'owner_user_id' | 'status'>;
+
 
 // Corresponds to `Venue` type in GraphQL schema
 export interface Venue extends AdminCreateVenueInput {

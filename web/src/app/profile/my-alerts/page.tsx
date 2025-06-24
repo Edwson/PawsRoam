@@ -7,10 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import AppProviders from '@/components/AppProviders';
 import Layout from '@/components/Layout';
-import Image from 'next/image'; // For pet images in alerts
-import Link from 'next/link';
+// import Image from 'next/image'; // Unused import
+// import Link from 'next/link'; // Unused import
 
-const defaultPetImage = "/default-pet-avatar.png";
+// const defaultPetImage = "/default-pet-avatar.png"; // Unused variable
 
 // GraphQL query to fetch alerts created by the current user
 const GET_MY_CREATED_ALERTS_QUERY = gql`
@@ -67,19 +67,19 @@ interface MyPetAlert {
 }
 
 // Styles can be shared or defined in a module
-const pageContainerStyle: React.CSSProperties = {
-  maxWidth: '900px',
-  margin: '2rem auto',
-  padding: '0 1rem', // No padding on container, cards will have it
-};
-const alertCardStyle: React.CSSProperties = {
-  backgroundColor: 'var(--current-surface)',
-  padding: '1.5rem',
-  borderRadius: '8px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-  marginBottom: '1.5rem',
-  border: '1px solid var(--current-border-color)',
-};
+// const pageContainerStyle: React.CSSProperties = { // Unused variable
+//   maxWidth: '900px',
+//   margin: '2rem auto',
+//   padding: '0 1rem', // No padding on container, cards will have it
+// };
+// const alertCardStyle: React.CSSProperties = { // Unused variable
+//   backgroundColor: 'var(--current-surface)',
+//   padding: '1.5rem',
+//   borderRadius: '8px',
+//   boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+//   marginBottom: '1.5rem',
+//   border: '1px solid var(--current-border-color)',
+// };
 
 
 const MyAlertsPageContent: React.FC = () => {
@@ -101,7 +101,7 @@ const MyAlertsPageContent: React.FC = () => {
     }
   );
 
-  const [cancelPetAlert, { loading: cancelLoading }] = useMutation(CANCEL_PET_ALERT_MUTATION, {
+  const [_cancelPetAlert, { /* loading: cancelLoading */ }] = useMutation(CANCEL_PET_ALERT_MUTATION, { // cancelLoading was unused
     onCompleted: (data) => {
       setFeedbackMessage({type: 'success', message: `Alert successfully cancelled (ID: ${data.cancelPetAlert.id}).`});
       refetch(); // Refresh the list
@@ -131,20 +131,20 @@ const MyAlertsPageContent: React.FC = () => {
   }, [feedbackMessage]);
 
 
-  const handleCancelAlert = (alertId: string, alertDescription: string) => {
-    if (window.confirm(`Are you sure you want to cancel the alert regarding "${alertDescription.substring(0,30)}..."? This action cannot be undone if the alert is still active.`)) {
-      cancelPetAlert({ variables: { alertId } });
-    }
-  };
+  // const handleCancelAlert = (alertId: string, alertDescription: string) => { // Unused function
+  //   if (window.confirm(`Are you sure you want to cancel the alert regarding "${alertDescription.substring(0,30)}..."? This action cannot be undone if the alert is still active.`)) {
+  //     _cancelPetAlert({ variables: { alertId } });
+  //   }
+  // };
 
   if (authLoading || queryLoading) return <p style={{textAlign: 'center', padding: '2rem'}}>Loading your alerts...</p>;
   if (!user && !authLoading) return <p style={{textAlign: 'center', padding: '2rem'}}>Please log in to manage your alerts.</p>; // Should be redirected by useEffect
   if (queryError) return <p className="error-message" style={{textAlign: 'center', padding: '2rem'}}>Error loading your alerts: {queryError.message}</p>;
 
-  const alerts = data?.getMyCreatedAlerts || [];
+  // const alerts = data?.getMyCreatedAlerts || []; // Unused variable
 
   // return ( // Added explicit parentheses
-  //   (<div style={pageContainerStyle}>
+  //   (<div /* style={pageContainerStyle} */ > {/* pageContainerStyle was unused */}
   //     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
   //       <h1 style={{color: 'var(--primary-color)'}}>My Reported Alerts</h1>
   //       <Link href="/alerts/create" className="button-style primary">

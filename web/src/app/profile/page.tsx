@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Import Link
 import styles from '../auth/AuthForm.module.css'; // Reuse auth form styles for container
 import ProfilePictureUpload from '@/components/profile/ProfilePictureUpload'; // Import the component
 import Image from 'next/image'; // For displaying current avatar

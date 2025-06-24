@@ -1,9 +1,9 @@
 // web/src/app/admin/venues/edit/[venueId]/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'; // Removed useEffect
 import { useParams } from 'next/navigation';
-import { gql, useQuery, ApolloCache, useApolloClient } from '@apollo/client';
+import { gql, useQuery, useApolloClient } from '@apollo/client'; // Removed ApolloCache
 import Layout from '@/components/Layout';
 import AppProviders from '@/components/AppProviders';
 import VenueForm from '@/components/admin/venues/VenueForm';
@@ -58,7 +58,7 @@ const EditVenuePageContent: React.FC = () => {
   const [currentVenue, setCurrentVenue] = useState<VenueType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { loading, error: queryError, data } = useQuery<{ getVenueById: VenueType }>(
+  const { loading, error: queryError, /* data */ } = useQuery<{ getVenueById: VenueType }>( // data was unused
     GET_VENUE_BY_ID_FOR_EDIT_PAGE,
     {
       variables: { id: venueId },

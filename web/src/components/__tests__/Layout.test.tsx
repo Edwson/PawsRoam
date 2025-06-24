@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import Layout from '@/components/Layout'; // Adjust path as necessary
 import { useAuth } from '@/contexts/AuthContext'; // Adjust path
-import { useRouter } from 'next/navigation'; // Adjust path
+// import { useRouter } from 'next/navigation'; // Adjust path - Unused import
 
 // Mock the useAuth hook
 jest.mock('@/contexts/AuthContext', () => ({

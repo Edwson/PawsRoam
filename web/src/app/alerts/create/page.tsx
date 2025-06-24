@@ -37,6 +37,22 @@ interface PetAlertFormData {
   last_seen_at?: string | null; // ISO DateTime string
 }
 
+// Interface for the object structure sent to the mutation
+interface SubmittedPetAlertInput {
+  alert_type: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  location_accuracy?: number | null;
+  pet_name?: string | null;
+  pet_species?: string | null;
+  pet_breed?: string | null;
+  pet_image_url?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  last_seen_at?: string | null;
+}
+
 const initialFormData: PetAlertFormData = {
   alert_type: 'lost_pet', // Default type
   description: '',
@@ -69,7 +85,7 @@ const inputStyle: React.CSSProperties = {
     backgroundColor: 'var(--input-bg-color)', color: 'var(--input-text-color)'
 };
 const textareaStyle: React.CSSProperties = { ...inputStyle, minHeight: '100px', resize: 'vertical' };
-const buttonStyle: React.CSSProperties = { /* Defined by .button-style.primary */ };
+// const buttonStyle: React.CSSProperties = { /* Defined by .button-style.primary */ }; // Unused variable
 
 
 const CreateAlertPageContent: React.FC = () => {
@@ -144,7 +160,7 @@ const CreateAlertPageContent: React.FC = () => {
       return;
     }
 
-    const inputToSubmit: any = { ...formData };
+    const inputToSubmit: SubmittedPetAlertInput = { ...formData } as unknown as SubmittedPetAlertInput;
     // Convert numeric fields from string if necessary, ensure null for empty optionals
     inputToSubmit.latitude = parseFloat(String(formData.latitude));
     inputToSubmit.longitude = parseFloat(String(formData.longitude));

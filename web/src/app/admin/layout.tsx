@@ -2,7 +2,7 @@
 
 import React, { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation'; // router was unused
 import Link from 'next/link';
 import styles from './AdminLayout.module.css'; // Import the CSS module
 
@@ -30,7 +30,7 @@ const adminContentStyle: React.CSSProperties = {
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+  // const router = useRouter(); // router was unused
 
   if (authLoading) {
     return (

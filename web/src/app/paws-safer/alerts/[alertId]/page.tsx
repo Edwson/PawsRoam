@@ -11,7 +11,7 @@ import PawsSaferLayout from '@/app/paws-safer/layout';
 import MainLayout from '@/components/Layout';
 import MapDisplay from '@/components/MapDisplay'; // Import MapDisplay
 
-const defaultPetImage = "/default-pet-avatar.png";
+// const defaultPetImage = "/default-pet-avatar.png"; // Unused variable
 const defaultUserAvatar = "/default-avatar.png";
 
 // GraphQL Query to get a specific Pet Alert by ID
@@ -78,18 +78,18 @@ const detailContainerStyle: React.CSSProperties = { padding: '1.5rem', backgroun
 const sectionStyle: React.CSSProperties = { marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px dashed var(--current-border-color)'};
 const titleStyle: React.CSSProperties = { color: 'var(--primary-color)', marginTop: 0, marginBottom: '1rem' };
 const labelStyle: React.CSSProperties = { fontWeight: 600, color: 'var(--text-color-muted)', minWidth: '120px', display: 'inline-block' };
-const mapPlaceholderStyle: React.CSSProperties = {
-    height: '300px', width: '100%', backgroundColor: '#e9e9e9',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    borderRadius: '4px', color: '#777', border: '1px solid #ccc',
-    textAlign: 'center'
-};
+// const mapPlaceholderStyle: React.CSSProperties = { // Unused variable
+//     height: '300px', width: '100%', backgroundColor: '#e9e9e9',
+//     display: 'flex', alignItems: 'center', justifyContent: 'center',
+//     borderRadius: '4px', color: '#777', border: '1px solid #ccc',
+//     textAlign: 'center'
+// };
 
 
 const AlertDetailPageContent: React.FC = () => {
   const params = useParams();
   const alertId = params.alertId as string;
-  const router = useRouter(); // Not used currently, but good to have if needed for redirects
+  // const router = useRouter(); // Unused variable
 
   const [statusUpdateNotes, setStatusUpdateNotes] = useState('');
   const [actionFeedback, setActionFeedback] = useState<{type:'success'|'error', message:string}|null>(null);

@@ -52,8 +52,8 @@ const PetForm: React.FC<PetFormProps> = ({
 
   const [
     executeSuggestNameQuery,
-    { loading: suggestionsLoading, error: suggestionsQueryError, data: suggestionsData }
-  ] = useLazyQuery(SUGGEST_PET_NAME_QUERY, {
+    { loading: suggestionsLoading, /* error: suggestionsQueryError, data: suggestionsData */ }
+  ] = useLazyQuery(SUGGEST_PET_NAME_QUERY, { // suggestionsQueryError, suggestionsData were unused
     onCompleted: (data) => {
       if (data && data.suggestPetName && data.suggestPetName.length > 0) {
         setNameSuggestions(data.suggestPetName);
