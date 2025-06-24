@@ -1,10 +1,12 @@
 # netlify.toml
 
-# Base settings for the Next.js app located in the 'web' subdirectory
+# Build settings for the Next.js app.
+# If your Netlify site settings have "Base directory" set to "web/",
+# then the command and publish are relative to that.
+# If "Base directory" is repository root, command should be "cd web && npm run build".
 [build]
-  base    = "web/" # Base directory: where your Next.js app's package.json is
-  command = "npm run build" # Build command (executed inside 'base' directory)
-  publish = ".next/" # Publish directory (relative to 'base' directory)
+  command = "npm run build" # Assumes Netlify "Base directory" is set to "web/" in the UI.
+  publish = ".next/"      # Publish directory relative to the "Base directory" ("web/").
 
 # Essential plugin for Next.js on Netlify.
 # This plugin handles most of the Next.js specific configurations,
