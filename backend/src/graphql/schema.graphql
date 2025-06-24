@@ -145,6 +145,7 @@ type Mutation {
 
   # Admin mutations for venue claims
   adminReviewVenueClaim(input: AdminReviewVenueClaimInput!): VenueClaim!
+  shopOwnerDeleteVenue(venueId: ID!): Boolean # New mutation for shop owner to delete their venue
 
   # Pet Alert Mutations
   createPetAlert(input: CreatePetAlertInput!): PetAlert!

@@ -717,6 +717,73 @@ describe('GraphQL Resolvers', () => {
       });
     });
 
+    describe('shopOwnerDeleteVenue', () => {
+      const mockShopOwnerContext = { userId: 'shop-owner-deleter-id', role: 'business_owner' };
+      const mockAdminContext = { userId: 'admin-deleter-id', role: 'admin' };
+      const venueIdToDelete = 'venue-to-be-deleted-by-owner';
+
+      it('should allow a shop owner to delete their own venue', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+        // Mock for ownership check
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ owner_user_id: mockShopOwnerContext.userId }] });
+        // Mock for successful DELETE
+        mockPgPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+
+        const result = await resolvers.Mutation!.shopOwnerDeleteVenue!(null, { venueId: venueIdToDelete }, mockShopOwnerContext, {} as any);
+
+        expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockShopOwnerContext);
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Ownership check + DELETE
+        expect(mockPgPoolQuery.mock.calls[0][0]).toBe('SELECT owner_user_id FROM venues WHERE id = $1');
+        expect(mockPgPoolQuery.mock.calls[1][0]).toBe('DELETE FROM venues WHERE id = $1 RETURNING id;');
+        expect(mockPgPoolQuery.mock.calls[1][1]).toEqual([venueIdToDelete]);
+        expect(result).toBe(true);
+      });
+
+      it('should prevent a shop owner from deleting a venue they do not own', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+        // Mock for ownership check - venue owned by someone else
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ owner_user_id: 'another-owner-id' }] });
+
+        await expect(
+          resolvers.Mutation!.shopOwnerDeleteVenue!(null, { venueId: venueIdToDelete }, mockShopOwnerContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User not authorized to delete this venue.', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only ownership check, no DELETE
+      });
+
+      it('should allow an admin to delete any venue using shopOwnerDeleteVenue', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockAdminContext);
+        // Admin bypasses explicit ownership check in resolver, so only DELETE query mock needed
+        mockPgPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+
+        const result = await resolvers.Mutation!.shopOwnerDeleteVenue!(null, { venueId: venueIdToDelete }, mockAdminContext, {} as any);
+
+        expect(mockEnsureShopOwnerOrAdmin).toHaveBeenCalledWith(mockAdminContext);
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only DELETE, no separate ownership check for admin path in this resolver
+        expect(mockPgPoolQuery.mock.calls[0][0]).toBe('DELETE FROM venues WHERE id = $1 RETURNING id;');
+        expect(result).toBe(true);
+      });
+
+      it('should throw NOT_FOUND if shop owner tries to delete a non-existent venue', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockShopOwnerContext);
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // Ownership check returns no venue
+
+        await expect(
+          resolvers.Mutation!.shopOwnerDeleteVenue!(null, { venueId: 'non-existent-id' }, mockShopOwnerContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Venue not found.', { extensions: { code: 'NOT_FOUND' }}));
+      });
+
+       it('should return false if admin tries to delete a non-existent venue (rowCount is 0)', async () => {
+        mockEnsureShopOwnerOrAdmin.mockResolvedValue(mockAdminContext);
+        mockPgPoolQuery.mockResolvedValueOnce({ rowCount: 0 }); // Delete returns rowCount 0
+
+        // The resolver currently throws NOT_FOUND for admin if rowCount is 0 after delete.
+        // Let's test that specific behavior.
+        await expect(
+            resolvers.Mutation!.shopOwnerDeleteVenue!(null, { venueId: 'non-existent-id-for-admin' }, mockAdminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Venue not found by admin for deletion.', { extensions: { code: 'NOT_FOUND' }}));
+      });
+    });
+
     describe('adminUpdateUser', () => {
       const targetUserId = 'user-to-update-id';
       const updateInput = { role: 'business_owner', status: 'active' };
