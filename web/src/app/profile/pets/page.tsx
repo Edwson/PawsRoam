@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import adminStyles from '@/app/admin/AdminLayout.module.css';
+import Image from 'next/image'; // Import Image component
+
+const defaultPetAvatar = "/default-pet-avatar.png"; // Default avatar
 
 // Define the GraphQL query for fetching pets
 const MY_PETS_QUERY = gql`
@@ -121,14 +124,24 @@ const MyPetsPage = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
           {pets.map((pet) => (
             <div key={pet.id} style={petCardStyle}>
-              <h3 style={{ marginTop: 0, color: 'var(--primary-color)' }}>{pet.name}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <Image
+                  src={pet.avatar_url || defaultPetAvatar}
+                  alt={`${pet.name}'s avatar`}
+                  width={60} // Adjust size as needed
+                  height={60}
+                  style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--secondary-color)' }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = defaultPetAvatar; }}
+                />
+                <h3 style={{ marginTop: 0, marginBottom: 0, color: 'var(--primary-color)' }}>{pet.name}</h3>
+              </div>
               <p><strong>Species:</strong> {pet.species}</p>
               {pet.breed && <p><strong>Breed:</strong> {pet.breed}</p>}
               {pet.birthdate && <p><strong>Birthdate:</strong> {new Date(pet.birthdate).toLocaleDateString()}</p>}
 
               <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                 <Link href={`/profile/pets/edit/${pet.id}`} className="button-style" style={{fontSize: '0.9rem', padding: '0.4rem 0.8rem'}}>
-                  Edit
+                  Edit &nbsp;🐾
                 </Link>
                 <button
                   onClick={() => handleDeletePet(pet.id, pet.name)}

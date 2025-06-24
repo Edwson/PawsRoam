@@ -485,5 +485,96 @@ describe('GraphQL Resolvers', () => {
         ).rejects.toThrow(new GraphQLError('Failed to update profile picture.', { extensions: { code: 'INTERNAL_SERVER_ERROR' }}));
       });
     });
+
+    describe('updatePetAvatar', () => {
+      const mockUserId = 'user-owner-123';
+      const authenticatedContext = { userId: mockUserId };
+      const mockPetId = 'pet-abc-789';
+      const newPetImageUrl = 'http://example.com/new-pet-avatar.jpg';
+
+      const mockOwnedDbPet = {
+        id: mockPetId,
+        user_id: mockUserId,
+        name: 'Buddy',
+        species: 'Dog',
+        avatar_url: 'http://example.com/old-buddy.jpg',
+        created_at: new Date('2023-02-01T00:00:00.000Z'),
+        updated_at: new Date('2023-02-01T00:00:00.000Z'),
+        birthdate: new Date('2022-01-01T00:00:00.000Z'),
+      };
+       const mockNotOwnedDbPet = {
+        id: 'pet-def-456',
+        user_id: 'other-user-id', // Different user
+        name: 'Shadow',
+        species: 'Cat',
+        avatar_url: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+        birthdate: null,
+      };
+
+      it('should update avatar_url for an owned pet and return the updated pet', async () => {
+        // Mock 1: Pet ownership check (SELECT user_id FROM pets WHERE id = $1)
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ user_id: mockUserId }] });
+        // Mock 2: Pet update (UPDATE pets SET avatar_url = $1 ... RETURNING *)
+        const updatedDbPetResponse = { ...mockOwnedDbPet, avatar_url: newPetImageUrl, updated_at: new Date() };
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [updatedDbPetResponse] });
+
+        const result = await resolvers.Mutation!.updatePetAvatar!(
+          null,
+          { petId: mockPetId, imageUrl: newPetImageUrl },
+          authenticatedContext,
+          {} as any
+        );
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2);
+        expect(mockPgPoolQuery.mock.calls[0][0]).toBe('SELECT user_id FROM pets WHERE id = $1');
+        expect(mockPgPoolQuery.mock.calls[0][1]).toEqual([mockPetId]);
+        expect(mockPgPoolQuery.mock.calls[1][0]).toBe('UPDATE pets SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3 RETURNING *;');
+        expect(mockPgPoolQuery.mock.calls[1][1]).toEqual([newPetImageUrl, mockPetId, mockUserId]);
+
+        expect(result.id).toBe(mockPetId);
+        expect(result.avatar_url).toBe(newPetImageUrl);
+        expect(result.name).toBe(mockOwnedDbPet.name);
+         expect(new Date(result.updated_at).getTime()).toBeGreaterThan(mockOwnedDbPet.updated_at.getTime());
+      });
+
+      it('should throw error if user is not authenticated', async () => {
+        await expect(
+          resolvers.Mutation!.updatePetAvatar!(null, { petId: mockPetId, imageUrl: newPetImageUrl }, noAuthContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } }));
+        expect(mockPgPoolQuery).not.toHaveBeenCalled();
+      });
+
+      it('should throw error if pet not found', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // Pet ownership check finds no pet
+
+        await expect(
+          resolvers.Mutation!.updatePetAvatar!(
+            null, { petId: 'non-existent-pet-id', imageUrl: newPetImageUrl }, authenticatedContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Pet not found.', { extensions: { code: 'NOT_FOUND' } }));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1);
+      });
+
+      it('should throw error if user does not own the pet', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ user_id: 'other-user-id-456' }] }); // Pet owned by someone else
+
+        await expect(
+          resolvers.Mutation!.updatePetAvatar!(
+            null, { petId: mockNotOwnedDbPet.id, imageUrl: newPetImageUrl }, authenticatedContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User not authorized to update this pet.', { extensions: { code: 'FORBIDDEN' } }));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1);
+      });
+
+      it('should handle database error during pet update', async () => {
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ user_id: mockUserId }] }); // Ownership check passes
+        mockPgPoolQuery.mockRejectedValueOnce(new Error('DB UPDATE failed')); // Update fails
+
+        await expect(
+          resolvers.Mutation!.updatePetAvatar!(
+            null, { petId: mockPetId, imageUrl: newPetImageUrl }, authenticatedContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Failed to update pet avatar.', { extensions: { code: 'INTERNAL_SERVER_ERROR' }}));
+         expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // Both ownership check and update attempt
+      });
+    });
   });
 });

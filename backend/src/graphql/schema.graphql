@@ -47,6 +47,9 @@ type Mutation {
 
   # User profile mutations
   updateUserProfilePicture(imageUrl: String!): User!
+
+  # Pet mutations
+  updatePetAvatar(petId: ID!, imageUrl: String!): Pet!
 }
 
 input AdminCreateVenueInput {
