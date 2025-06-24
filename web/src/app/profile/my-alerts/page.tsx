@@ -143,69 +143,74 @@ const MyAlertsPageContent: React.FC = () => {
 
   const alerts = data?.getMyCreatedAlerts || [];
 
-  return ( // Added explicit parentheses
-    (<div style={pageContainerStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 style={{color: 'var(--primary-color)'}}>My Reported Alerts</h1>
-        <Link href="/alerts/create" className="button-style primary">
-          Create New Alert
-        </Link>
-      </div>
+  // return ( // Added explicit parentheses
+  //   (<div style={pageContainerStyle}>
+  //     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+  //       <h1 style={{color: 'var(--primary-color)'}}>My Reported Alerts</h1>
+  //       <Link href="/alerts/create" className="button-style primary">
+  //         Create New Alert
+  //       </Link>
+  //     </div>
 
-      {feedbackMessage && (
-        <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '4px', backgroundColor: feedbackMessage.type === 'success' ? 'var(--success-bg-color)' : 'var(--error-bg-color)', color: feedbackMessage.type === 'success' ? 'var(--success-color)' : 'var(--error-color)', border: `1px solid ${feedbackMessage.type === 'success' ? 'var(--success-color)' : 'var(--error-color)'}`}}>
-          {feedbackMessage.message}
-        </div>
-      )}
+  //     {feedbackMessage && (
+  //       <div style={{ padding: '1rem', marginBottom: '1rem', borderRadius: '4px', backgroundColor: feedbackMessage.type === 'success' ? 'var(--success-bg-color)' : 'var(--error-bg-color)', color: feedbackMessage.type === 'success' ? 'var(--success-color)' : 'var(--error-color)', border: `1px solid ${feedbackMessage.type === 'success' ? 'var(--success-color)' : 'var(--error-color)'}`}}>
+  //         {feedbackMessage.message}
+  //       </div>
+  //     )}
 
-      {alerts.length === 0 ? (
-        <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--current-surface)', borderRadius: '8px', border: '1px dashed var(--current-border-color)'}}>
-          <p>You haven&apos;t created any pet alerts yet.</p>
-        </div>
-      ) : (
-        alerts.map(alert => (
-          <div key={alert.id} style={alertCardStyle}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem'}}>
-                <h3 style={{marginTop:0, marginBottom:'0.2rem', color: alert.status === 'active' ? 'var(--error-color)' : (alert.status === 'resolved' ? 'var(--success-color)' : 'var(--text-color-muted')) }}>
-                    {alert.alert_type.replace('_', ' ').toUpperCase()} - {alert.pet_name || 'Pet Details N/A'}
-                </h3>
-                <span style={{
-                    padding: '0.3em 0.7em', borderRadius: '12px', fontSize: '0.85em', fontWeight: 500,
-                    backgroundColor: alert.status === 'active' ? 'var(--error-bg-color)' : (alert.status === 'resolved' ? 'var(--success-bg-color)' : (alert.status === 'investigating' ? 'var(--info-bg-color)' : 'var(--disabled-bg-color)')),
-                    color: alert.status === 'active' ? 'var(--error-color)' : (alert.status === 'resolved' ? 'var(--success-color)' : (alert.status === 'investigating' ? 'var(--info-color)' : 'var(--disabled-text-color)')),
-                }}>
-                    {alert.status.replace('_', ' ')}
-                </span>
-            </div>
+  //     {alerts.length === 0 ? (
+  //       <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--current-surface)', borderRadius: '8px', border: '1px dashed var(--current-border-color)'}}>
+  //         <p>You haven&apos;t created any pet alerts yet.</p>
+  //       </div>
+  //     ) : (
+  //       alerts.map(alert => (
+  //         <div key={alert.id} style={alertCardStyle}>
+  //           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem'}}>
+  //               <h3 style={{marginTop:0, marginBottom:'0.2rem', color: alert.status === 'active' ? 'var(--error-color)' : (alert.status === 'resolved' ? 'var(--success-color)' : 'var(--text-color-muted')) }}>
+  //                   {alert.alert_type.replace('_', ' ').toUpperCase()} - {alert.pet_name || 'Pet Details N/A'}
+  //               </h3>
+  //               <span style={{
+  //                   padding: '0.3em 0.7em', borderRadius: '12px', fontSize: '0.85em', fontWeight: 500,
+  //                   backgroundColor: alert.status === 'active' ? 'var(--error-bg-color)' : (alert.status === 'resolved' ? 'var(--success-bg-color)' : (alert.status === 'investigating' ? 'var(--info-bg-color)' : 'var(--disabled-bg-color)')),
+  //                   color: alert.status === 'active' ? 'var(--error-color)' : (alert.status === 'resolved' ? 'var(--success-color)' : (alert.status === 'investigating' ? 'var(--info-color)' : 'var(--disabled-text-color)')),
+  //               }}>
+  //                   {alert.status.replace('_', ' ')}
+  //               </span>
+  //           </div>
 
-            {alert.pet_image_url && (
-                <Image src={alert.pet_image_url} alt={alert.pet_name || 'Pet image'} width={80} height={80} style={{objectFit:'cover', borderRadius:'4px', float:'right', marginLeft:'1rem', marginBottom:'0.5rem'}} onError={(e) => {(e.target as HTMLImageElement).style.display='none'}} />
-            )}
-            <p><strong>Description:</strong> <span style={{whiteSpace: 'pre-wrap'}}>{alert.description}</span></p>
-            {alert.pet_species && <p><strong>Species:</strong> {alert.pet_species} {alert.pet_breed && `(${alert.pet_breed})`}</p>}
-            {alert.last_seen_at && <p><strong>Last Seen/Occurred:</strong> {new Date(alert.last_seen_at).toLocaleString()}</p>}
-            <p><strong>Location:</strong> Approx. {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}</p>
-            {(alert.contact_phone || alert.contact_email) && (
-                <p><strong>Public Contact:</strong> {alert.contact_phone || ''} {alert.contact_phone && alert.contact_email && ' / '} {alert.contact_email || ''}</p>
-            )}
-            <p style={{fontSize:'0.8em', color: 'var(--text-color-muted)'}}>Reported: {new Date(alert.created_at).toLocaleString()} | Updated: {new Date(alert.updated_at).toLocaleString()}</p>
-            {alert.resolved_at && <p style={{fontSize:'0.8em', color: 'var(--success-color)'}}>Resolved: {new Date(alert.resolved_at).toLocaleString()}</p>}
+  //           {alert.pet_image_url && (
+  //               <Image src={alert.pet_image_url} alt={alert.pet_name || 'Pet image'} width={80} height={80} style={{objectFit:'cover', borderRadius:'4px', float:'right', marginLeft:'1rem', marginBottom:'0.5rem'}} onError={(e) => {(e.target as HTMLImageElement).style.display='none'}} />
+  //           )}
+  //           <p><strong>Description:</strong> <span style={{whiteSpace: 'pre-wrap'}}>{alert.description}</span></p>
+  //           {alert.pet_species && <p><strong>Species:</strong> {alert.pet_species} {alert.pet_breed && `(${alert.pet_breed})`}</p>}
+  //           {alert.last_seen_at && <p><strong>Last Seen/Occurred:</strong> {new Date(alert.last_seen_at).toLocaleString()}</p>}
+  //           <p><strong>Location:</strong> Approx. {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}</p>
+  //           {(alert.contact_phone || alert.contact_email) && (
+  //               <p><strong>Public Contact:</strong> {alert.contact_phone || ''} {alert.contact_phone && alert.contact_email && ' / '} {alert.contact_email || ''}</p>
+  //           )}
+  //           <p style={{fontSize:'0.8em', color: 'var(--text-color-muted)'}}>Reported: {new Date(alert.created_at).toLocaleString()} | Updated: {new Date(alert.updated_at).toLocaleString()}</p>
+  //           {alert.resolved_at && <p style={{fontSize:'0.8em', color: 'var(--success-color)'}}>Resolved: {new Date(alert.resolved_at).toLocaleString()}</p>}
 
-            {alert.status === 'active' && (
-              <div style={{marginTop: '1rem', borderTop: '1px dashed var(--current-border-color)', paddingTop: '1rem'}}>
-                <button
-                    onClick={() => handleCancelAlert(alert.id, alert.description)}
-                    className="button-style danger small"
-                    disabled={cancelLoading}
-                >
-                  {cancelLoading ? 'Cancelling...' : 'Cancel This Alert'}
-                </button>
-              </div>
-            )}
-          </div>
-        ))
-      )}
-    </div>) // Added explicit parentheses
+  //           {alert.status === 'active' && (
+  //             <div style={{marginTop: '1rem', borderTop: '1px dashed var(--current-border-color)', paddingTop: '1rem'}}>
+  //               <button
+  //                   onClick={() => handleCancelAlert(alert.id, alert.description)}
+  //                   className="button-style danger small"
+  //                   disabled={cancelLoading}
+  //               >
+  //                 {cancelLoading ? 'Cancelling...' : 'Cancel This Alert'}
+  //               </button>
+  //             </div>
+  //           )}
+  //         </div>
+  //       ))
+  //     )}
+  //   </div>)
+  // );
+  return (
+    <div>
+      <p>Test My Alerts Content. Line 147 is this div.</p>
+    </div>
   );
 };
 
