@@ -98,9 +98,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <nav style={navStyle}>
           <Link href="/" style={navLinkStyle}>Home</Link>
           <Link href="/map" style={navLinkStyle}>Map Discovery</Link>
-          <Link href="/ai-pet-care" style={navLinkStyle}>Pet Care AI</Link> {/* New Link */}
+          <Link href="/ai-pet-care" style={navLinkStyle}>Pet Care AI</Link>
           {user ? (
             <>
+              {user.role === 'business_owner' && (
+                <Link href="/shop-owner/dashboard" style={navLinkStyle}>Shop Dashboard</Link>
+              )}
+              {user.role === 'admin' && (
+                 <Link href="/admin" style={navLinkStyle}>Admin</Link>
+              )}
               {user.avatar_url ? (
                 <Link href="/profile" passHref>
                   <a style={{ ...navLinkStyle, padding: '0.2rem', borderRadius: '50%', display: 'flex', alignItems: 'center' }}>

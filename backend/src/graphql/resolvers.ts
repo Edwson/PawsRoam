@@ -389,6 +389,75 @@ export const resolvers: Resolvers = {
       }
     },
 
+    adminUpdateUser: async (_parent: any, { userId, input }: { userId: string, input: any /* AdminUpdateUserInput */ }, context: ResolverContext) => {
+      await ensureAdmin(context);
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+
+      const { name, email, role, status } = input;
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      let valueCount = 1;
+
+      if (name !== undefined) { setClauses.push(`name = $${valueCount++}`); values.push(name); }
+      if (email !== undefined) {
+        // Optional: Add validation if email format is correct
+        // Optional: Check if new email already exists for another user
+        setClauses.push(`email = $${valueCount++}`); values.push(email);
+      }
+      if (role !== undefined) {
+        // Optional: Validate role against a list of allowed roles
+        setClauses.push(`role = $${valueCount++}`); values.push(role);
+      }
+      if (status !== undefined) {
+        // Optional: Validate status against a list of allowed statuses
+        setClauses.push(`status = $${valueCount++}`); values.push(status);
+      }
+
+      if (setClauses.length === 0) {
+        throw new GraphQLError('No update fields provided', { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+
+      setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
+
+      const query = `
+        UPDATE users SET ${setClauses.join(', ')}
+        WHERE id = $${valueCount++}
+        RETURNING *;
+      `;
+      values.push(userId);
+
+      try {
+        const result = await pgPool.query<DbUser>(query, values);
+        if (result.rows.length === 0) {
+          throw new GraphQLError('User not found or update failed', { extensions: { code: 'NOT_FOUND' } });
+        }
+        const updatedUser = result.rows[0];
+        // Map to GraphQL User type, ensuring all fields are present
+        return {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          role: updatedUser.role,
+          status: updatedUser.status,
+          // avatar_url: updatedUser.avatar_url, // If avatar_url is part of DbUser and User type
+          created_at: updatedUser.created_at.toISOString(),
+          updated_at: updatedUser.updated_at.toISOString(),
+        };
+      } catch (dbError: any) {
+        console.error("Error in adminUpdateUser:", dbError);
+        if (dbError.code === '23505' && dbError.constraint === 'users_email_key') { // Unique constraint violation for email
+            throw new GraphQLError('Email address is already in use by another account.', {
+                extensions: { code: 'BAD_USER_INPUT' },
+            });
+        }
+        throw new GraphQLError('Failed to update user.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
     adminUpdateVenueImage: async (_parent: any, { venueId, imageUrl }: { venueId: string, imageUrl: string }, context: ResolverContext) => {
       await ensureAdmin(context);
       if (!pgPool) {
