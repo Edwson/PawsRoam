@@ -3,8 +3,10 @@
 "use client";
 
 import { useParams } from 'next/navigation';
-import { gql, useQuery } from '@apollo/client';
-import Link from 'next/link'; // For linking back or to other pages
+import { gql, useQuery, useMutation } from '@apollo/client'; // Added useMutation
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext'; // Added useAuth
+import React, { useState } from 'react'; // Added useState for modal
 
 // Components to integrate
 import ReviewList from '@/components/reviews/ReviewList';
@@ -49,6 +51,7 @@ const GET_VENUE_BY_ID = gql`
       average_rating
       review_count
       image_url # Fetch image_url
+      owner_user_id # Fetch owner_user_id to check if venue is already owned
       reviews {
         id
         rating
@@ -108,34 +111,91 @@ interface Venue {
   average_rating?: number | null;
   review_count?: number | null;
   reviews: Review[];
-  image_url?: string | null; // Add to interface
+  image_url?: string | null;
+  owner_user_id?: string | null; // Add to interface
 }
+
+const REQUEST_VENUE_CLAIM_MUTATION = gql`
+  mutation RequestVenueClaim($input: RequestVenueClaimInput!) {
+    requestVenueClaim(input: $input) {
+      id
+      status
+      venue { id name }
+      user { id name }
+    }
+  }
+`;
 
 const VenueDetailPageContent = () => {
   const params = useParams();
-  const venueId = params.venueId as string; // Ensure venueId is a string
+  const { user: currentUser } = useAuth(); // Get current user for role check
+  const venueId = params.venueId as string;
+
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimMessage, setClaimMessage] = useState('');
+  const [claimFeedback, setClaimFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const { data, loading, error, refetch: refetchVenue } = useQuery<{ getVenueById: Venue }>(
     GET_VENUE_BY_ID,
     {
       variables: { id: venueId },
-      skip: !venueId, // Skip query if venueId is not yet available
+      skip: !venueId,
     }
   );
 
+  const [requestVenueClaim, { loading: claimLoading }] = useMutation(REQUEST_VENUE_CLAIM_MUTATION, {
+    onCompleted: (data) => {
+      setClaimFeedback({ type: 'success', message: `Claim for "${data.requestVenueClaim.venue.name}" submitted! Status: ${data.requestVenueClaim.status}. Admin will review it.` });
+      setIsClaimModalOpen(false);
+      setClaimMessage('');
+      // Optionally refetch venue data if claim status should be shown on page, or disable button etc.
+      // For now, just show message and close modal.
+    },
+    onError: (err) => {
+      setClaimFeedback({ type: 'error', message: `Claim submission failed: ${err.message}` });
+    }
+  });
+
   const handleReviewAdded = () => {
-    refetchVenue(); // Refetch venue data to update review list and average rating
+    refetchVenue();
   };
 
-  if (loading) return <p>Loading venue details...</p>;
-  if (error) return <p>Error loading venue: {error.message}</p>;
-  if (!data || !data.getVenueById) return <p>Venue not found.</p>;
+  const handleOpenClaimModal = () => {
+    setClaimFeedback(null);
+    setIsClaimModalOpen(true);
+  };
+
+  const handleCloseClaimModal = () => {
+    setIsClaimModalOpen(false);
+    setClaimMessage('');
+  };
+
+  const handleSubmitClaim = () => {
+    if (!venueId) return;
+    requestVenueClaim({ variables: { input: { venueId, claimMessage: claimMessage.trim() === '' ? null : claimMessage.trim() } } });
+  };
+
+  if (loading) return <p style={{textAlign: 'center', padding: '2rem'}}>Loading venue details...</p>;
+  if (error) return <p className="error-message" style={{textAlign: 'center', padding: '2rem'}}>Error loading venue: {error.message}</p>;
+  if (!data || !data.getVenueById) return <p style={{textAlign: 'center', padding: '2rem'}}>Venue not found.</p>;
 
   const venue = data.getVenueById;
+  const canClaimVenue = currentUser?.role === 'business_owner' && !venue.owner_user_id;
 
   return (
     <div style={{ padding: '20px' }}>
       <Link href="/map" style={{ display: 'inline-block', marginBottom: '1rem' }}>&larr; Back to Map</Link>
+
+      {claimFeedback && (
+        <div style={{
+          padding: '1rem', marginBottom: '1rem', borderRadius: '4px',
+          backgroundColor: claimFeedback.type === 'success' ? 'var(--success-bg-color)' : 'var(--error-bg-color)',
+          color: claimFeedback.type === 'success' ? 'var(--success-color)' : 'var(--error-color)',
+          border: `1px solid ${claimFeedback.type === 'success' ? 'var(--success-color)' : 'var(--error-color)'}`
+        }}>
+          {claimFeedback.message}
+        </div>
+      )}
 
       {venue.image_url && (
         <div style={{ marginBottom: '1.5rem', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
@@ -152,6 +212,19 @@ const VenueDetailPageContent = () => {
       )}
 
       <h1>{venue.name}</h1>
+      {canClaimVenue && (
+        <button onClick={handleOpenClaimModal} className="button-style primary" style={{marginLeft: '1rem', marginBottom: '1rem', float: 'right'}}>
+          Claim This Venue
+        </button>
+      )}
+      {venue.owner_user_id && currentUser?.id === venue.owner_user_id && (
+        <span style={{fontSize: '0.9em', color: 'var(--success-color)', marginLeft: '1rem', float: 'right', border: '1px solid', padding: '0.5rem 0.8rem', borderRadius: '4px'}}>✓ You own this venue</span>
+      )}
+       {venue.owner_user_id && currentUser?.id !== venue.owner_user_id && (
+        <span style={{fontSize: '0.9em', color: 'var(--text-color-muted)', marginLeft: '1rem', float: 'right', border: '1px solid', padding: '0.5rem 0.8rem', borderRadius: '4px'}}>Owned by another member</span>
+      )}
+      <div style={{clear:'both'}}></div>
+
       <p><strong>Type:</strong> {venue.type}</p>
       <p><strong>Address:</strong> {`${venue.address || ''}, ${venue.city || ''}, ${venue.state_province || ''} ${venue.postal_code || ''}, ${venue.country || ''}`.replace(/ , |^, | ,$/g, '') || 'N/A'}</p>
       {venue.website && <p><strong>Website:</strong> <a href={venue.website} target="_blank" rel="noopener noreferrer">{venue.website}</a></p>}
@@ -180,6 +253,27 @@ const VenueDetailPageContent = () => {
       <AddReviewForm venueId={venue.id} onReviewAdded={handleReviewAdded} />
       <ReviewList reviews={venue.reviews} />
 
+      {isClaimModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
+          <div style={{ backgroundColor: 'var(--current-surface)', padding: '2rem', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '90%', maxWidth: '500px' }}>
+            <h3>Request to Claim &quot;{venue.name}&quot;</h3>
+            <p>If you are the owner or an authorized representative of this venue, you can request to claim it. Please provide a brief message for the admin team if you wish.</p>
+            <textarea
+              value={claimMessage}
+              onChange={(e) => setClaimMessage(e.target.value)}
+              placeholder="Optional: e.g., I am the manager, here is our business registration..."
+              rows={4}
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--current-border-color)', marginBottom: '1rem', resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button onClick={handleCloseClaimModal} className="button-style secondary" disabled={claimLoading}>Cancel</button>
+              <button onClick={handleSubmitClaim} className="button-style primary" disabled={claimLoading}>
+                {claimLoading ? 'Submitting...' : 'Submit Claim Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

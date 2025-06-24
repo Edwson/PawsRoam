@@ -70,6 +70,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
           <Link href="/admin" className={styles.adminNavLink}>Dashboard</Link>
           <Link href="/admin/users" className={styles.adminNavLink}>Manage Users</Link>
           <Link href="/admin/venues" className={styles.adminNavLink}>Manage Venues</Link>
+          <Link href="/admin/claims" className={styles.adminNavLink}>Venue Claims</Link>
           {/* Add more admin links here as features are added */}
           {/* e.g., <Link href="/admin/reviews" className={styles.adminNavLink}>Manage Reviews</Link> */}
         </nav>
