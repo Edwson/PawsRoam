@@ -446,18 +446,51 @@ export const resolvers: Resolvers = {
         });
       }
     },
-    searchVenues: async (_: any, { filterByName, filterByType }: { filterByName?: string, filterByType?: string }) => {
+    searchVenues: async (
+      _: any,
+      { filterByName, filterByType, latitude, longitude, radiusKm }: {
+        filterByName?: string,
+        filterByType?: string,
+        latitude?: number,
+        longitude?: number,
+        radiusKm?: number
+      }
+    ) => {
       if (!pgPool) {
         throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
       }
 
-      let query = 'SELECT * FROM venues';
+      let query = '';
       const conditions: string[] = [];
-      const values: (string | number)[] = [];
+      const values: (string | number | boolean)[] = []; // Allow boolean for future use if needed
       let valueCount = 1;
 
+      // Haversine distance calculation function (in kilometers)
+      // p_lat1, p_lng1: point 1 (user's location)
+      // p_lat2, p_lng2: point 2 (venue's location)
+      const haversineDistanceKm = `
+        (
+          6371 * acos(
+            cos(radians($${valueCount})) * cos(radians(latitude)) *
+            cos(radians(longitude) - radians($${valueCount + 1})) +
+            sin(radians($${valueCount})) * sin(radians(latitude))
+          )
+        )
+      `;
+
+      if (latitude !== undefined && longitude !== undefined && radiusKm !== undefined) {
+        query = `SELECT *, ${haversineDistanceKm} AS distance_km FROM venues`;
+        values.push(latitude, longitude); // These are $1 and $2 for the distance function
+        valueCount += 2; // Increment for the lat/lng params used in distance calc
+
+        conditions.push(`${haversineDistanceKm.replace(`$${valueCount-2}`, '$1').replace(`$${valueCount-1}`, '$2')} <= $${valueCount++}`); // Compare with radius
+        values.push(radiusKm);
+      } else {
+        query = 'SELECT * FROM venues';
+      }
+
       if (filterByName) {
-        conditions.push(`name ILIKE $${valueCount++}`); // ILIKE for case-insensitive search
+        conditions.push(`name ILIKE $${valueCount++}`);
         values.push(`%${filterByName}%`);
       }
       if (filterByType) {
@@ -468,10 +501,18 @@ export const resolvers: Resolvers = {
       if (conditions.length > 0) {
         query += ' WHERE ' + conditions.join(' AND ');
       }
-      query += ' ORDER BY created_at DESC LIMIT 50'; // Add ordering and limit for safety
+
+      if (latitude !== undefined && longitude !== undefined && radiusKm !== undefined) {
+        query += ' ORDER BY distance_km ASC, created_at DESC LIMIT 50';
+      } else {
+        query += ' ORDER BY created_at DESC LIMIT 50';
+      }
+
+      console.log("Executing searchVenues query:", query);
+      console.log("With values:", values);
 
       try {
-        const result = await pgPool.query<DbVenue>(query, values);
+        const result = await pgPool.query<DbVenue & { distance_km?: number }>(query, values);
         // Ensure numeric fields are numbers, not strings from pg driver
         return result.rows.map(venue => ({
           ...venue,

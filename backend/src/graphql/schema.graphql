@@ -20,7 +20,13 @@ type Query {
   _empty: String # Placeholder to ensure Query type is valid
   # me: User # Example query to get current user
   testGemini(prompt: String!): String # Test query for Gemini API
-  searchVenues(filterByName: String, filterByType: String): [Venue!] # Query for venues
+  searchVenues(
+    filterByName: String,
+    filterByType: String,
+    latitude: Float,
+    longitude: Float,
+    radiusKm: Float
+  ): [Venue!] # Query for venues, now with optional geo-filtering
   myPets: [Pet!] # Query to get pets for the authenticated user
   getPetById(id: ID!): Pet # Query to get a single pet by its ID, for editing
   getVenueById(id: ID!): Venue # Query to get a single venue by its ID
