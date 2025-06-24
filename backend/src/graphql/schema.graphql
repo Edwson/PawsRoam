@@ -61,6 +61,39 @@ type Mutation {
 
   # Shop Owner mutations
   shopOwnerCreateVenue(input: AdminCreateVenueInput!): Venue! # Reusing AdminCreateVenueInput
+  shopOwnerUpdateVenueDetails(venueId: ID!, input: ShopOwnerUpdateVenueInput!): Venue!
+  shopOwnerUpdateVenueImage(venueId: ID!, imageUrl: String!): Venue!
+}
+
+input ShopOwnerUpdateVenueInput {
+  name: String
+  address: String
+  city: String
+  state_province: String
+  postal_code: String
+  country: String
+  latitude: Float
+  longitude: Float
+  phone_number: String
+  website: String
+  description: String
+  opening_hours: JSON
+  type: String
+
+  pet_policy_summary: String
+  pet_policy_details: String
+  allows_off_leash: Boolean
+  has_indoor_seating_for_pets: Boolean
+  has_outdoor_seating_for_pets: Boolean
+  water_bowls_provided: Boolean
+  pet_treats_available: Boolean
+  pet_menu_available: Boolean
+  dedicated_pet_area: Boolean
+  weight_limit_kg: Float
+  carrier_required: Boolean
+  additional_pet_services: String
+  # Note: 'status' and 'owner_user_id' are intentionally omitted for shop owner updates
+  google_place_id: String
 }
 
 input AdminUpdateUserInput {
