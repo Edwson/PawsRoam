@@ -230,10 +230,191 @@ describe('GraphQL Resolvers', () => {
 
   // Add describe blocks for Mutation resolvers (e.g., registerUser, loginUser)
   // These would require more complex mocking for pgPool.query
-  // For example:
-  // describe('Mutation Resolvers', () => {
-  //   describe('registerUser', () => {
-  //     // Test cases for registerUser
-  //   });
-  // });
+  describe('Mutation Resolvers', () => {
+    // Mock context for an admin user
+    const adminContext = { userId: 'admin-user-id' };
+    // Mock context for a non-admin user
+    const nonAdminContext = { userId: 'non-admin-user-id' };
+    // Mock context for no user
+    const noAuthContext = { userId: null };
+
+    // Mock ensureAdmin behavior by mocking pgPool.query for user role check
+    const mockAdminUserRole = () => mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ role: 'admin' }] });
+    const mockNonAdminUserRole = () => mockPgPoolQuery.mockResolvedValueOnce({ rows: [{ role: 'user' }] });
+    const mockUserNotFound = () => mockPgPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+
+    describe('adminCreateVenue', () => {
+      const venueInput = {
+        name: "Admin Cafe",
+        type: "cafe",
+        latitude: 35.123,
+        longitude: 139.456,
+        // ... other required fields from AdminCreateVenueInput
+      };
+      const dbResponseVenue = {
+        ...venueInput,
+        id: 'new-venue-id',
+        owner_user_id: null,
+        status: 'pending_approval',
+        created_at: new Date(),
+        updated_at: new Date(),
+        // ... fill out all fields as they would come from DB
+      };
+       const expectedGqlVenue = {
+        ...dbResponseVenue,
+        latitude: 35.123, // ensure float
+        longitude: 139.456, // ensure float
+        weight_limit_kg: null, // if not provided
+        created_at: dbResponseVenue.created_at.toISOString(),
+        updated_at: dbResponseVenue.updated_at.toISOString(),
+      };
+
+
+      it('should allow admin to create a venue', async () => {
+        mockAdminUserRole(); // User is admin
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [dbResponseVenue] }); // DB insert response
+
+        const result = await resolvers.Mutation!.adminCreateVenue!(null, { input: venueInput }, adminContext, {} as any);
+
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2); // 1 for role check, 1 for insert
+        expect(mockPgPoolQuery.mock.calls[1][0]).toContain('INSERT INTO venues');
+        // Loop through keys of venueInput to check if they are included in the values array (mock.calls[1][1])
+        const dbArgs = mockPgPoolQuery.mock.calls[1][1];
+        expect(dbArgs).toContain(venueInput.name);
+        expect(dbArgs).toContain(venueInput.type);
+        expect(dbArgs).toContain(venueInput.latitude);
+        expect(dbArgs).toContain(venueInput.longitude);
+
+        expect(result).toEqual(expectedGqlVenue);
+      });
+
+      it('should prevent non-admin from creating a venue', async () => {
+        mockNonAdminUserRole(); // User is not admin
+
+        await expect(
+          resolvers.Mutation!.adminCreateVenue!(null, { input: venueInput }, nonAdminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authorized to perform this action', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only role check
+      });
+
+       it('should prevent unauthenticated user from creating a venue', async () => {
+        // ensureAdmin will throw 'User is not authenticated' before role check query
+        await expect(
+          resolvers.Mutation!.adminCreateVenue!(null, { input: venueInput }, noAuthContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' }}));
+        expect(mockPgPoolQuery).not.toHaveBeenCalled(); // No DB calls
+      });
+
+      it('should handle database error during venue creation', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockRejectedValueOnce(new Error('DB insert failed')); // DB insert fails
+
+        await expect(
+          resolvers.Mutation!.adminCreateVenue!(null, { input: venueInput }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Failed to create venue.', { extensions: { code: 'INTERNAL_SERVER_ERROR' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('adminUpdateVenue', () => {
+      const venueId = 'venue-to-update-id';
+      const updateInput = { name: "Updated Cafe Name", status: "active" };
+      const dbResponseUpdatedVenue = {
+        id: venueId,
+        name: "Updated Cafe Name",
+        type: "cafe", // Assuming original type
+        latitude: 35.123,
+        longitude: 139.456,
+        status: "active",
+        created_at: new Date(), // Should be original created_at
+        updated_at: new Date(), // Should be new updated_at
+        // ... other fields
+      };
+       const expectedGqlUpdatedVenue = {
+        ...dbResponseUpdatedVenue,
+         latitude: 35.123,
+         longitude: 139.456,
+         weight_limit_kg: null,
+        created_at: dbResponseUpdatedVenue.created_at.toISOString(),
+        updated_at: dbResponseUpdatedVenue.updated_at.toISOString(),
+      };
+
+      it('should allow admin to update a venue', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [dbResponseUpdatedVenue] }); // DB update response
+
+        const result = await resolvers.Mutation!.adminUpdateVenue!(null, { id: venueId, input: updateInput }, adminContext, {} as any);
+
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2);
+        const updateQueryCall = mockPgPoolQuery.mock.calls[1];
+        expect(updateQueryCall[0]).toContain('UPDATE venues SET');
+        expect(updateQueryCall[0]).toContain('name = $1');
+        expect(updateQueryCall[0]).toContain('status = $2');
+        expect(updateQueryCall[0]).toContain('updated_at = CURRENT_TIMESTAMP');
+        expect(updateQueryCall[1]).toEqual([updateInput.name, updateInput.status, venueId]);
+        expect(result).toEqual(expectedGqlUpdatedVenue);
+      });
+
+      it('should throw error if venue not found during update', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockResolvedValueOnce({ rows: [] }); // DB update returns no rows
+
+        await expect(
+          resolvers.Mutation!.adminUpdateVenue!(null, { id: venueId, input: updateInput }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Venue not found or update failed', { extensions: { code: 'NOT_FOUND' }}));
+      });
+       it('should prevent non-admin from updating a venue', async () => {
+        mockNonAdminUserRole();
+        await expect(
+            resolvers.Mutation!.adminUpdateVenue!(null, { id: venueId, input: updateInput }, nonAdminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authorized to perform this action', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only role check
+      });
+    });
+
+    describe('adminDeleteVenue', () => {
+      const venueId = 'venue-to-delete-id';
+
+      it('should allow admin to delete a venue', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockResolvedValueOnce({ rowCount: 1 }); // DB delete response
+
+        const result = await resolvers.Mutation!.adminDeleteVenue!(null, { id: venueId }, adminContext, {} as any);
+
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(2);
+        expect(mockPgPoolQuery.mock.calls[1][0]).toContain('DELETE FROM venues WHERE id = $1');
+        expect(mockPgPoolQuery.mock.calls[1][1]).toEqual([venueId]);
+        expect(result).toBe(true);
+      });
+
+      it('should return false if venue not found for deletion', async () => {
+        mockAdminUserRole();
+        mockPgPoolQuery.mockResolvedValueOnce({ rowCount: 0 }); // DB delete returns 0 rows
+
+        const result = await resolvers.Mutation!.adminDeleteVenue!(null, { id: venueId }, adminContext, {} as any);
+        expect(result).toBe(false);
+      });
+
+      it('should handle foreign key constraint error during deletion', async () => {
+        mockAdminUserRole();
+        const dbError = new Error('FK violation');
+        (dbError as any).code = '23503'; // Simulate PostgreSQL FK error code
+        mockPgPoolQuery.mockRejectedValueOnce(dbError);
+
+        await expect(
+          resolvers.Mutation!.adminDeleteVenue!(null, { id: venueId }, adminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('Cannot delete venue. It may have associated reviews or other dependent data.', {
+            extensions: { code: 'BAD_REQUEST' },
+        }));
+      });
+       it('should prevent non-admin from deleting a venue', async () => {
+        mockNonAdminUserRole();
+        await expect(
+            resolvers.Mutation!.adminDeleteVenue!(null, { id: venueId }, nonAdminContext, {} as any)
+        ).rejects.toThrow(new GraphQLError('User is not authorized to perform this action', { extensions: { code: 'FORBIDDEN' }}));
+        expect(mockPgPoolQuery).toHaveBeenCalledTimes(1); // Only role check
+      });
+    });
+  });
 });
