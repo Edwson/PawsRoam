@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { gql, useQuery, ApolloCache, useApolloClient } from '@apollo/client';
+import { gql, useQuery, useMutation, ApolloCache, useApolloClient } from '@apollo/client'; // Added useMutation
 // ShopOwnerLayout will provide AppProviders and the main Layout wrapper
 import VenueForm from '@/components/admin/venues/VenueForm'; // Reusing the admin form
 import VenueImageUpload from '@/components/admin/venues/VenueImageUpload'; // Reusing the admin image uploader
@@ -51,6 +51,12 @@ const GET_VENUE_BY_ID_FOR_OWNER_EDIT = gql`
   }
 `;
 
+const SHOP_OWNER_DELETE_VENUE_MUTATION = gql`
+  mutation ShopOwnerDeleteVenue($venueId: ID!) {
+    shopOwnerDeleteVenue(venueId: $venueId)
+  }
+`;
+
 const EditVenueByShopOwnerPageContent: React.FC = () => {
   const params = useParams();
   const router = useRouter();
@@ -86,6 +92,23 @@ const EditVenueByShopOwnerPageContent: React.FC = () => {
     }
   );
 
+  const [shopOwnerDeleteVenue, { loading: deleteLoading }] = useMutation(SHOP_OWNER_DELETE_VENUE_MUTATION, {
+    onCompleted: (data) => {
+      if (data.shopOwnerDeleteVenue) {
+        setSuccessMessage("Venue deleted successfully. Redirecting to My Venues...");
+        setTimeout(() => router.push('/shop-owner/venues?venueDeleted=true'), 2000);
+      } else {
+        setErrorMessage("Failed to delete venue, or venue not found for deletion.");
+      }
+    },
+    onError: (err) => {
+      setErrorMessage(`Error deleting venue: ${err.message}`);
+    },
+    // Refetch MyOwnedVenues list after deletion
+    refetchQueries: [ { query: gql`query MyOwnedVenues { myOwnedVenues { id name } }` } ], // Simplified refetch query
+    // Or update cache manually
+  });
+
   const handleDetailsUpdateSuccess = () => {
     setSuccessMessage("Venue details updated successfully!");
     refetchVenueData(); // Refetch to ensure all data is fresh
@@ -116,6 +139,13 @@ const EditVenueByShopOwnerPageContent: React.FC = () => {
   if (currentVenue && currentVenue.owner_user_id !== user?.id) {
     return <p className="error-message" style={{textAlign: 'center', padding: '2rem'}}>{errorMessage || "Access Denied: You do not own this venue."}</p>;
   }
+
+  const handleDeleteVenue = () => {
+    if (!currentVenue) return;
+    if (window.confirm(`Are you sure you want to permanently delete venue "${currentVenue.name}"? This action cannot be undone.`)) {
+      shopOwnerDeleteVenue({ variables: { venueId: currentVenue.id } });
+    }
+  };
 
 
   return (
@@ -161,6 +191,24 @@ const EditVenueByShopOwnerPageContent: React.FC = () => {
           )}
         </div>
       </div>
+
+      {currentVenue && (
+        <div style={{marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--current-border-color)'}}>
+            <h3 style={{color: 'var(--error-color)'}}>Danger Zone</h3>
+            <p style={{fontSize: '0.9em', color: 'var(--text-color-muted)'}}>
+                Deleting your venue is permanent and will remove all its data, including reviews.
+                This action cannot be undone.
+            </p>
+            <button
+                onClick={handleDeleteVenue}
+                className="button-style danger"
+                disabled={deleteLoading}
+                style={{marginTop: '0.5rem'}}
+            >
+                {deleteLoading ? 'Deleting...' : 'Delete This Venue Permanently'}
+            </button>
+        </div>
+      )}
     </div>
   );
 };

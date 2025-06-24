@@ -656,6 +656,46 @@ export const resolvers: Resolvers = {
       }
     },
 
+    shopOwnerDeleteVenue: async (_parent: any, { venueId }: { venueId: string }, context: ResolverContext) => {
+      const { userId, role } = await ensureShopOwnerOrAdmin(context);
+      if (!pgPool) throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+
+      // Check ownership IF the user is not an admin (admins can delete any venue)
+      if (role !== 'admin') {
+        const venueCheckResult = await pgPool.query('SELECT owner_user_id FROM venues WHERE id = $1', [venueId]);
+        if (venueCheckResult.rows.length === 0) {
+          throw new GraphQLError('Venue not found.', { extensions: { code: 'NOT_FOUND' } });
+        }
+        if (venueCheckResult.rows[0].owner_user_id !== userId) {
+          throw new GraphQLError('User not authorized to delete this venue.', { extensions: { code: 'FORBIDDEN' } });
+        }
+      }
+
+      // Proceed with deletion
+      // Note: Foreign key constraints on `reviews.venue_id` and `venue_claims.venue_id` are `ON DELETE CASCADE`,
+      // so associated reviews and claims will be automatically deleted.
+      const query = 'DELETE FROM venues WHERE id = $1 RETURNING id;';
+      try {
+        const result = await pgPool.query(query, [venueId]);
+        if (result.rowCount === 0 && role === 'admin') { // If admin tried to delete non-existent venue
+             throw new GraphQLError('Venue not found by admin for deletion.', { extensions: { code: 'NOT_FOUND' } });
+        }
+        return result.rowCount === 1;
+      } catch (dbError: any) {
+        console.error("Error in shopOwnerDeleteVenue:", dbError);
+        // It's possible a FK constraint (other than reviews/claims if not set to cascade) could prevent deletion.
+        // Error code '23503' is for foreign key violation.
+        if (dbError.code === '23503') {
+             throw new GraphQLError('Cannot delete venue. It may have other associated data that prevents deletion.', {
+                extensions: { code: 'BAD_REQUEST', originalError: "Foreign key constraint violation." },
+            });
+        }
+        throw new GraphQLError('Failed to delete venue.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
     createPetAlert: async (_parent: any, { input }: { input: any /* CreatePetAlertInput */ }, context: ResolverContext) => {
       if (!context.userId) {
         throw new GraphQLError('User is not authenticated. Please log in to create an alert.', { extensions: { code: 'UNAUTHENTICATED' } });
