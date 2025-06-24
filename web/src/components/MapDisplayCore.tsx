@@ -39,20 +39,23 @@ interface Venue {
   allows_off_leash?: boolean | null;
   has_outdoor_seating_for_pets?: boolean | null;
   water_bowls_provided?: boolean | null;
-  opening_hours?: any | null; // JSON object
-  // Add other fields from GraphQL query as needed for display
+  opening_hours?: any | null;
+  average_rating?: number | null;
+  review_count?: number | null;
 }
 
 interface MapDisplayCoreProps {
   initialCenter?: [number, number];
   initialZoom?: number;
-  venues?: Venue[]; // Array of venues to display markers for
+  venues?: Venue[];
+  onViewReviews: (venueId: string, venueName: string) => void; // Added prop
 }
 
 const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
   initialCenter = [35.6895, 139.6917], // Default to Tokyo
   initialZoom = 13,
   venues = [],
+  onViewReviews, // Destructure the new prop
 }) => {
   // Ensure Leaflet's CSS is loaded. This is usually done globally,
   // but can be an issue with dynamic imports if not handled carefully.
@@ -104,8 +107,25 @@ const MapDisplayCore: React.FC<MapDisplayCoreProps> = ({
                 {venue.water_bowls_provided && <li>✔️ Water bowls provided</li>}
               </ul>
 
+              {/* Display Average Rating and Review Count */}
+              <div style={{ margin: '0.5rem 0', fontSize: '0.9rem' }}>
+                {typeof venue.average_rating === 'number' && venue.average_rating > 0 ? (
+                  <span>⭐ {venue.average_rating.toFixed(1)} ({venue.review_count} review{venue.review_count !== 1 ? 's' : ''})</span>
+                ) : (
+                  <span>No reviews yet</span>
+                )}
+              </div>
+
               {/* Placeholder for opening hours - might need a helper to format nicely */}
               {/* {venue.opening_hours && <p style={{margin: '0.25rem 0', fontSize: '0.85rem'}}>Hours: {JSON.stringify(venue.opening_hours)}</p>} */}
+
+              <button
+                onClick={() => onViewReviews(venue.id, venue.name)}
+                className="button-style"
+                style={{fontSize: '0.9rem', padding: '0.3rem 0.6rem', marginTop: '0.5rem', backgroundColor: 'var(--accent-color)'}}
+              >
+                View/Add Reviews
+              </button>
 
               {/* Add a link to a future venue details page */}
               {/* <Link href={`/venues/${venue.id}`}>More details</Link> */}

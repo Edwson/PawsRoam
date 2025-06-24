@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { gql, useQuery } from '@apollo/client';
-import MapDisplay from '@/components/MapDisplay'; // Import the dynamically loaded map
+import MapDisplay from '@/components/MapDisplay';
+import ReviewModal from '@/components/modals/ReviewModal'; // Import ReviewModal
 
 // Define the GraphQL query for searching venues
 const SEARCH_VENUES_QUERY = gql`
@@ -21,6 +22,8 @@ const SEARCH_VENUES_QUERY = gql`
       has_outdoor_seating_for_pets
       water_bowls_provided
       opening_hours # This is JSON, ensure MapDisplayCore can handle or format it
+      average_rating # Added
+      review_count   # Added
     }
   }
 `;
@@ -40,49 +43,52 @@ interface Venue {
   has_outdoor_seating_for_pets?: boolean | null;
   water_bowls_provided?: boolean | null;
   opening_hours?: any | null;
+  average_rating?: number | null; // Added
+  review_count?: number | null;   // Added
 }
 
 const MapPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
 
-  // Variables for the GraphQL query
   const [queryVariables, setQueryVariables] = useState({
     filterByName: '',
     filterByType: '',
   });
 
-  const { loading, error, data, refetch } = useQuery(SEARCH_VENUES_QUERY, {
+  // State for Review Modal
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedVenueForReviews, setSelectedVenueForReviews] = useState<{id: string; name: string} | null>(null);
+
+  const { loading, error, data, refetch: refetchVenues } = useQuery(SEARCH_VENUES_QUERY, {
     variables: queryVariables,
-    notifyOnNetworkStatusChange: true, // Useful if you want to show loading states on refetch
+    notifyOnNetworkStatusChange: true,
   });
 
   const venuesToDisplay: Venue[] = data?.searchVenues || [];
 
-  // Handle search term submission (e.g., on button click or debounce)
-  const handleSearch = () => {
-    setQueryVariables({
-      filterByName: searchTerm,
-      filterByType: filterType,
-    });
-    // refetch(); // useQuery typically refetches when variables change, but explicit refetch can be used.
-  };
-
-  // useEffect to refetch when searchTerm or filterType changes (debounced approach would be better for searchTerm)
   useEffect(() => {
-    // A simple way to trigger refetch when filters change.
-    // For searchTerm, debounce would be better to avoid too many API calls.
     const handler = setTimeout(() => {
         setQueryVariables({
             filterByName: searchTerm,
             filterByType: filterType,
         });
-    }, 500); // Debounce search term by 500ms
-
-    return () => {
-        clearTimeout(handler);
-    };
+    }, 500);
+    return () => clearTimeout(handler);
   }, [searchTerm, filterType]);
+
+  const handleOpenReviewModal = (venueId: string, venueName: string) => {
+    setSelectedVenueForReviews({ id: venueId, name: venueName });
+    setIsReviewModalOpen(true);
+  };
+
+  const handleCloseReviewModal = () => {
+    setIsReviewModalOpen(false);
+    setSelectedVenueForReviews(null);
+    // Optionally refetch venues if a review was added, to update avg_rating shown on map
+    // This could be more specific if ReviewModal had an onReviewAdded callback that then calls refetchVenues
+    refetchVenues();
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' /* Adjust height based on your layout */ }}>
@@ -129,12 +135,23 @@ const MapPage = () => {
       <div style={{ flexGrow: 1, border: '1px solid var(--current-border-color)', borderRadius: '4px', overflow: 'hidden' }}>
         {!loading && !error && (
           <MapDisplay
-            initialCenter={[35.6895, 139.6917]} // Default to Tokyo, or derive from user's location later
-            initialZoom={11} // Adjust zoom level
+            initialCenter={[35.6895, 139.6917]}
+            initialZoom={11}
             venues={venuesToDisplay}
+            onViewReviews={handleOpenReviewModal} // Pass the handler
           />
         )}
       </div>
+
+      {selectedVenueForReviews && (
+        <ReviewModal
+          venueId={selectedVenueForReviews.id}
+          venueName={selectedVenueForReviews.name}
+          isOpen={isReviewModalOpen}
+          onClose={handleCloseReviewModal}
+          // onReviewAdded={refetchVenues} // Consider adding this callback to ReviewModal for more direct refetch control
+        />
+      )}
     </div>
   );
 };
