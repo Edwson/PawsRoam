@@ -339,6 +339,52 @@ export const resolvers: Resolvers = {
       }
     },
 
+    updatePetAvatar: async (_parent: any, { petId, imageUrl }: { petId: string, imageUrl: string }, context: ResolverContext) => {
+      if (!context.userId) {
+        throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
+      }
+      if (!pgPool) {
+        throw new GraphQLError('Database not configured', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+      }
+
+      try {
+        // Verify pet ownership first
+        const petCheckResult = await pgPool.query<DbPet>('SELECT user_id FROM pets WHERE id = $1', [petId]);
+        if (petCheckResult.rows.length === 0) {
+          throw new GraphQLError('Pet not found.', { extensions: { code: 'NOT_FOUND' } });
+        }
+        if (petCheckResult.rows[0].user_id !== context.userId) {
+          throw new GraphQLError('User not authorized to update this pet.', { extensions: { code: 'FORBIDDEN' } });
+        }
+
+        // Update the pet's avatar_url
+        const updateResult = await pgPool.query<DbPet>(
+          'UPDATE pets SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3 RETURNING *;',
+          [imageUrl, petId, context.userId]
+        );
+
+        if (updateResult.rows.length === 0) {
+          // This should ideally not happen if the above checks passed, but as a safeguard:
+          throw new GraphQLError('Failed to update pet avatar. Pet not found or not owned by user.', { extensions: { code: 'INTERNAL_SERVER_ERROR' } });
+        }
+
+        const updatedPet = updateResult.rows[0];
+        return {
+          ...updatedPet,
+          birthdate: updatedPet.birthdate ? updatedPet.birthdate.toISOString().split('T')[0] : null,
+          created_at: updatedPet.created_at.toISOString(),
+          updated_at: updatedPet.updated_at.toISOString(),
+        };
+
+      } catch (dbError: any) {
+        console.error("Error in updatePetAvatar:", dbError);
+        if (dbError instanceof GraphQLError) throw dbError; // Re-throw if it's already a GraphQLError
+        throw new GraphQLError('Failed to update pet avatar.', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR', originalError: dbError.message },
+        });
+      }
+    },
+
     updateUserProfilePicture: async (_parent: any, { imageUrl }: { imageUrl: string }, context: ResolverContext) => {
       if (!context.userId) {
         throw new GraphQLError('User is not authenticated', { extensions: { code: 'UNAUTHENTICATED' } });
